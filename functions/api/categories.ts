@@ -1,4 +1,3 @@
-// functions/api/categories.ts
 import type { PagesFunction } from '@cloudflare/workers-types';
 
 type Env = { DB: D1Database };
@@ -20,26 +19,59 @@ export const onRequestOptions: PagesFunction = async () =>
 
 const str = (v: any) => String(v ?? '').trim();
 
+const SOUND_APP_CATEGORIES = [
+  'Splay Spika',
+  'Mic',
+  'Subwoofer',
+  'TV',
+  'Guitars',
+  'Keyboards',
+  'Honspeaker',
+  'Studio Accessories',
+  'Mixers',
+];
+
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   try {
     if (!env.DB) return json({ success: false, error: 'DB binding missing (DB)' }, 500);
 
     const url = new URL(request.url);
     const id = str(url.searchParams.get('id'));
+    const app = str(url.searchParams.get('app')).toLowerCase();
+
+    // app=sound should only return the allowed categories
+    const isSoundApp = app === 'sound';
 
     if (id) {
-      const row = await env.DB
-        .prepare(`SELECT id, name, icon, created_at, updated_at FROM categories WHERE id=? LIMIT 1`)
-        .bind(id)
-        .first<any>();
+      let query = `SELECT id, name, icon, created_at, updated_at FROM categories WHERE id=?`;
+      const binds: any[] = [id];
+
+      if (isSoundApp) {
+        const placeholders = SOUND_APP_CATEGORIES.map(() => '?').join(', ');
+        query += ` AND name IN (${placeholders})`;
+        binds.push(...SOUND_APP_CATEGORIES);
+      }
+
+      query += ` LIMIT 1`;
+
+      const row = await env.DB.prepare(query).bind(...binds).first<any>();
 
       if (!row) return json({ success: false, error: 'Not found' }, 404);
       return json({ success: true, data: row });
     }
 
-    const rows = await env.DB
-      .prepare(`SELECT id, name, icon, created_at, updated_at FROM categories ORDER BY CAST(id AS INTEGER) ASC`)
-      .all<any>();
+    let query = `SELECT id, name, icon, created_at, updated_at FROM categories`;
+    const binds: any[] = [];
+
+    if (isSoundApp) {
+      const placeholders = SOUND_APP_CATEGORIES.map(() => '?').join(', ');
+      query += ` WHERE name IN (${placeholders})`;
+      binds.push(...SOUND_APP_CATEGORIES);
+    }
+
+    query += ` ORDER BY CAST(id AS INTEGER) ASC`;
+
+    const rows = await env.DB.prepare(query).bind(...binds).all<any>();
 
     return json({ success: true, data: rows.results || [] });
   } catch (e: any) {
