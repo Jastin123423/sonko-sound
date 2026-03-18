@@ -11,7 +11,11 @@ const cors = {
 const json = (data: any, status = 200) =>
   new Response(JSON.stringify(data), {
     status,
-    headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+    headers: {
+      ...cors,
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
+    },
   });
 
 export const onRequestOptions: PagesFunction = async () =>
@@ -20,30 +24,35 @@ export const onRequestOptions: PagesFunction = async () =>
 const str = (v: any) => String(v ?? '').trim();
 
 const SOUND_APP_CATEGORIES = [
-  'Splay Spika',
+  'Spika',
   'Mic',
   'Subwoofer',
   'TV',
   'Guitars',
   'Keyboards',
-  'Honspeaker',
+  'Hon Speaker',
   'Studio Accessories',
   'Mixers',
 ];
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   try {
-    if (!env.DB) return json({ success: false, error: 'DB binding missing (DB)' }, 500);
+    if (!env.DB) {
+      return json({ success: false, error: 'DB binding missing (DB)' }, 500);
+    }
 
     const url = new URL(request.url);
     const id = str(url.searchParams.get('id'));
     const app = str(url.searchParams.get('app')).toLowerCase();
 
-    // app=sound should only return the allowed categories
     const isSoundApp = app === 'sound';
 
     if (id) {
-      let query = `SELECT id, name, icon, created_at, updated_at FROM categories WHERE id=?`;
+      let query = `
+        SELECT id, name, icon, created_at, updated_at
+        FROM categories
+        WHERE id = ?
+      `;
       const binds: any[] = [id];
 
       if (isSoundApp) {
@@ -60,7 +69,10 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       return json({ success: true, data: row });
     }
 
-    let query = `SELECT id, name, icon, created_at, updated_at FROM categories`;
+    let query = `
+      SELECT id, name, icon, created_at, updated_at
+      FROM categories
+    `;
     const binds: any[] = [];
 
     if (isSoundApp) {
@@ -73,7 +85,14 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 
     const rows = await env.DB.prepare(query).bind(...binds).all<any>();
 
-    return json({ success: true, data: rows.results || [] });
+    return json({
+      success: true,
+      app,
+      filtered: isSoundApp,
+      allowedNames: isSoundApp ? SOUND_APP_CATEGORIES : null,
+      count: rows.results?.length || 0,
+      data: rows.results || [],
+    });
   } catch (e: any) {
     return json({ success: false, error: e?.message || 'Failed to load categories' }, 500);
   }
