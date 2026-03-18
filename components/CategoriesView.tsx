@@ -3,17 +3,17 @@ import { Category, Product } from '../types';
 import ProductGrid from './ProductGrid';
 import AdBanner from './AdBanner';
 
-// Cache for categories to avoid multiple fetches
-let categoriesCache: Category[] | null = null;
-let cacheTimestamp: number | null = null;
-const CACHE_DURATION = 1000 * 60 * 60; // 1 hour cache
-
 interface CategoriesViewProps {
   onCategorySelect: (category: Category) => void;
   onShowAllProducts?: () => void;
   suggestedProducts?: Product[];
   onProductClick?: (product: Product) => void;
 }
+
+// Cache for categories to avoid multiple fetches
+let categoriesCache: Category[] | null = null;
+let cacheTimestamp: number | null = null;
+const CACHE_DURATION = 1000 * 60 * 60; // 1 hour cache
 
 const CategoriesView: React.FC<CategoriesViewProps> = ({
   onCategorySelect,
@@ -25,12 +25,16 @@ const CategoriesView: React.FC<CategoriesViewProps> = ({
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastFetchTime, setLastFetchTime] = useState<number | null>(null);
 
+  // Single source of truth for categories - ONLY from API with ?app=sound
   useEffect(() => {
     const fetchCategories = async () => {
       const now = Date.now();
 
+      // Check memory cache first (1 hour TTL)
       if (categoriesCache && cacheTimestamp && now - cacheTimestamp < CACHE_DURATION) {
+        console.log('📦 Using cached categories from memory');
         setCategories(categoriesCache);
         setIsLoading(false);
         return;
@@ -40,40 +44,111 @@ const CategoriesView: React.FC<CategoriesViewProps> = ({
         setIsLoading(true);
         setError(null);
 
+        console.log('🌐 Fetching categories from API: /api/categories?app=sound');
+        
+        // IMPORTANT: Always use the full URL with ?app=sound parameter
         const response = await fetch('https://barakasonko.store/api/categories?app=sound', {
           method: 'GET',
           headers: {
-            Accept: 'application/json',
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache', // Ensure we get fresh data
           },
         });
 
         if (!response.ok) {
-          throw new Error(`Failed to fetch categories: ${response.status}`);
+          throw new Error(`Failed to fetch categories: ${response.status} ${response.statusText}`);
         }
 
         const jsonResponse = await response.json();
 
-        if (!jsonResponse?.success || !Array.isArray(jsonResponse.data)) {
-          throw new Error('Invalid categories response');
+        // Validate response structure
+        if (!jsonResponse) {
+          throw new Error('Empty response from server');
         }
 
-        const fetchedCategories: Category[] = jsonResponse.data;
+        if (!jsonResponse.success) {
+          throw new Error(jsonResponse.message || 'API returned unsuccessful response');
+        }
 
+        if (!Array.isArray(jsonResponse.data)) {
+          console.warn('API response data is not an array:', jsonResponse.data);
+          throw new Error('Invalid data format: expected array');
+        }
+
+        // Process and validate each category
+        const fetchedCategories: Category[] = jsonResponse.data
+          .filter((item: any) => item && (item.id || item._id)) // Ensure each item has an ID
+          .map((item: any) => ({
+            id: String(item.id || item._id || ''),
+            name: String(item.name || item.category_name || item.title || 'Unnamed Category'),
+            icon: item.icon || item.icon_name || item.icon_emoji || item.icon_url || getDefaultCategoryIcon(item.name || ''),
+            ...item
+          }));
+
+        if (fetchedCategories.length === 0) {
+          console.warn('API returned empty categories array');
+        }
+
+        // Update memory cache
         categoriesCache = fetchedCategories;
         cacheTimestamp = now;
+        
+        // Update state
         setCategories(fetchedCategories);
+        setLastFetchTime(now);
+        
+        console.log(`✅ Loaded ${fetchedCategories.length} categories from API`);
       } catch (err) {
-        console.error('Error fetching categories:', err);
+        console.error('❌ Error fetching categories:', err);
         setError(err instanceof Error ? err.message : 'Failed to load categories');
-        setCategories([]);
+        
+        // If we have stale cache, show it as fallback
+        if (categoriesCache) {
+          console.log('📦 Using stale cache as fallback');
+          setCategories(categoriesCache);
+          setError(null); // Clear error since we have fallback data
+        } else {
+          setCategories([]);
+        }
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchCategories();
-  }, []);
+  }, []); // Empty deps array - only runs once on mount
 
+  // Helper function for default icons (moved inside component to avoid external dependency)
+  const getDefaultCategoryIcon = (categoryName: string): string => {
+    const name = categoryName.toLowerCase();
+    
+    if (name.includes('phone') || name.includes('simu')) return '📱';
+    if (name.includes('tv') || name.includes('television')) return '📺';
+    if (name.includes('sound') || name.includes('sauti')) return '🔊';
+    if (name.includes('speaker') || name.includes('spika')) return '🔊';
+    if (name.includes('microphone') || name.includes('mic')) return '🎤';
+    if (name.includes('camera') || name.includes('kamera')) return '📷';
+    if (name.includes('laptop') || name.includes('kompyuta')) return '💻';
+    if (name.includes('game') || name.includes('mchezo')) return '🎮';
+    if (name.includes('watch') || name.includes('saa')) return '⌚';
+    if (name.includes('home') || name.includes('nyumba')) return '🏠';
+    if (name.includes('kitchen') || name.includes('jikoni')) return '🍳';
+    if (name.includes('car') || name.includes('gari')) return '🚗';
+    if (name.includes('health') || name.includes('afya')) return '❤️';
+    if (name.includes('book') || name.includes('kitabu')) return '📚';
+    if (name.includes('fashion') || name.includes('mitindo')) return '👕';
+    if (name.includes('all') || name.includes('zote')) return '🛒';
+    if (name.includes('electronics') || name.includes('umeme')) return '🔌';
+    if (name.includes('accessories') || name.includes('vifaa')) return '🛍️';
+    if (name.includes('charger') || name.includes('chaja')) return '🔋';
+    if (name.includes('cable') || name.includes('waya')) return '📟';
+    if (name.includes('adapter') || name.includes('adaptor')) return '🔌';
+    if (name.includes('battery') || name.includes('betri')) return '🔋';
+    
+    return '🛒';
+  };
+
+  // Filter categories based on search term
   const filteredCategories = useMemo(() => {
     if (!searchTerm.trim()) return categories;
 
@@ -84,10 +159,12 @@ const CategoriesView: React.FC<CategoriesViewProps> = ({
     );
   }, [searchTerm, categories]);
 
+  // Limit suggested products
   const displayProducts = useMemo(() => {
     return suggestedProducts.slice(0, 15);
   }, [suggestedProducts]);
 
+  // Quick stats for UI
   const quickStats = useMemo(() => {
     return [
       { label: 'Categories', value: categories.length },
@@ -96,6 +173,7 @@ const CategoriesView: React.FC<CategoriesViewProps> = ({
     ];
   }, [categories.length, displayProducts.length, searchTerm, filteredCategories.length]);
 
+  // Loading state
   if (isLoading) {
     return (
       <div className="min-h-screen pb-12 bg-gradient-to-b from-[#fffaf5] via-white to-white animate-fadeIn">
@@ -124,7 +202,8 @@ const CategoriesView: React.FC<CategoriesViewProps> = ({
     );
   }
 
-  if (error) {
+  // Error state - only show if we have no categories AND there's an error
+  if (error && categories.length === 0) {
     return (
       <div className="min-h-screen pb-12 bg-gradient-to-b from-[#fffaf5] via-white to-white animate-fadeIn">
         <div className="px-4 pt-5">
@@ -153,6 +232,7 @@ const CategoriesView: React.FC<CategoriesViewProps> = ({
     );
   }
 
+  // Main render
   return (
     <div className="min-h-screen pb-12 bg-gradient-to-b from-[#fffaf5] via-white to-white animate-fadeIn">
       <div className="px-4 pt-5">
@@ -183,7 +263,14 @@ const CategoriesView: React.FC<CategoriesViewProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 mt-5">
+            {/* Last fetched indicator - optional, shows when data was loaded */}
+            {lastFetchTime && (
+              <div className="mt-3 text-[10px] text-orange-100/80">
+                Updated: {new Date(lastFetchTime).toLocaleTimeString()}
+              </div>
+            )}
+
+            <div className="grid grid-cols-3 gap-2 mt-3">
               {quickStats.map((item) => (
                 <div key={item.label} className="rounded-2xl bg-white/12 border border-white/10 px-3 py-2.5">
                   <p className="text-lg font-extrabold text-white leading-none">{item.value}</p>
@@ -312,7 +399,7 @@ const CategoriesView: React.FC<CategoriesViewProps> = ({
             Clear Search
           </button>
         </div>
-      ) : (
+      ) : categories.length === 0 ? (
         <div className="mx-4 mb-7 rounded-[28px] bg-white border border-orange-100 shadow-sm px-5 py-12 flex flex-col items-center justify-center text-center">
           <div className="w-16 h-16 bg-orange-50 rounded-full flex items-center justify-center mb-4">
             <svg className="w-8 h-8 text-orange-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -324,7 +411,7 @@ const CategoriesView: React.FC<CategoriesViewProps> = ({
             The API returned no categories for this app.
           </p>
         </div>
-      )}
+      ) : null}
 
       <div className="px-4">
         <div className="rounded-[28px] overflow-hidden border border-orange-100 shadow-sm bg-white">
