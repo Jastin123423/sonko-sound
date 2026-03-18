@@ -1,7 +1,5 @@
-{
-  "name": "sonko-sound",
-  "compatibility_date": "2026-03-18",
-  "assets": {
-    "directory": "./dist"
-  }
-}
+name = "sonko-sound"
+compatibility_date = "2026-03-18"
+
+[assets]
+directory = "./dist"
