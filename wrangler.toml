@@ -1,5 +1,15 @@
-name = "sonko-sound"
-compatibility_date = "2026-03-18"
+name = "baraka-sonko-electronics"
+compatibility_date = "2026-02-02"
+pages_build_output_dir = "dist"
 
-[assets]
-directory = "./dist"
+[[d1_databases]]
+binding = "DB"
+database_name = "sonko"
+database_id = "0777b428-f6f5-4900-bbd5-d6694ccc8586"
+
+[[r2_buckets]]
+binding = "R2_MEDIA"
+bucket_name = "sonko"
+
+[vars]
+PUBLIC_MEDIA_BASE = "https://media.barakasonko.store"
