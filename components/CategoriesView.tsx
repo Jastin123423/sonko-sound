@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useEffect } from 'react';
 import { Category, Product } from '../types';
 import ProductGrid from './ProductGrid';
@@ -26,7 +25,6 @@ const CategoriesView: React.FC<CategoriesViewProps> = ({
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [usingFallback, setUsingFallback] = useState(false);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -42,7 +40,12 @@ const CategoriesView: React.FC<CategoriesViewProps> = ({
         setIsLoading(true);
         setError(null);
 
-        const response = await fetch('https://barakasonko.store/api/categories?app=sound');
+        const response = await fetch('https://barakasonko.store/api/categories?app=sound', {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+          },
+        });
 
         if (!response.ok) {
           throw new Error(`Failed to fetch categories: ${response.status}`);
@@ -50,21 +53,19 @@ const CategoriesView: React.FC<CategoriesViewProps> = ({
 
         const jsonResponse = await response.json();
 
-        if (jsonResponse.success && Array.isArray(jsonResponse.data)) {
-          const fetchedCategories = jsonResponse.data;
-          categoriesCache = fetchedCategories;
-          cacheTimestamp = now;
-          setCategories(fetchedCategories);
-          setUsingFallback(false);
-        } else {
-          setCategories(CATEGORIES);
-          setUsingFallback(true);
+        if (!jsonResponse?.success || !Array.isArray(jsonResponse.data)) {
+          throw new Error('Invalid categories response');
         }
+
+        const fetchedCategories: Category[] = jsonResponse.data;
+
+        categoriesCache = fetchedCategories;
+        cacheTimestamp = now;
+        setCategories(fetchedCategories);
       } catch (err) {
         console.error('Error fetching categories:', err);
         setError(err instanceof Error ? err.message : 'Failed to load categories');
-        setCategories(CATEGORIES);
-        setUsingFallback(true);
+        setCategories([]);
       } finally {
         setIsLoading(false);
       }
@@ -78,8 +79,8 @@ const CategoriesView: React.FC<CategoriesViewProps> = ({
 
     const term = searchTerm.toLowerCase().trim();
     return categories.filter(cat =>
-      cat.name.toLowerCase().includes(term) ||
-      cat.id.toLowerCase().includes(term)
+      String(cat.name ?? '').toLowerCase().includes(term) ||
+      String(cat.id ?? '').toLowerCase().includes(term)
     );
   }, [searchTerm, categories]);
 
@@ -89,7 +90,7 @@ const CategoriesView: React.FC<CategoriesViewProps> = ({
 
   const quickStats = useMemo(() => {
     return [
-      { label: 'Categories', value: categories.length || CATEGORIES.length },
+      { label: 'Categories', value: categories.length },
       { label: 'Suggested', value: displayProducts.length },
       { label: 'Search', value: searchTerm.trim() ? filteredCategories.length : 'All' },
     ];
@@ -123,7 +124,7 @@ const CategoriesView: React.FC<CategoriesViewProps> = ({
     );
   }
 
-  if (error && !usingFallback) {
+  if (error) {
     return (
       <div className="min-h-screen pb-12 bg-gradient-to-b from-[#fffaf5] via-white to-white animate-fadeIn">
         <div className="px-4 pt-5">
@@ -154,7 +155,6 @@ const CategoriesView: React.FC<CategoriesViewProps> = ({
 
   return (
     <div className="min-h-screen pb-12 bg-gradient-to-b from-[#fffaf5] via-white to-white animate-fadeIn">
-      {/* Hero Header */}
       <div className="px-4 pt-5">
         <div className="relative overflow-hidden rounded-[30px] bg-gradient-to-r from-orange-500 via-orange-500 to-orange-600 p-5 shadow-sm">
           <div className="absolute -right-8 -top-8 w-28 h-28 rounded-full bg-white/10" />
@@ -172,11 +172,6 @@ const CategoriesView: React.FC<CategoriesViewProps> = ({
                 <p className="text-sm text-orange-100 mt-2 max-w-xs leading-relaxed">
                   Find audio gear, electronics, accessories and more in one modern collection.
                 </p>
-                {usingFallback && (
-                  <p className="text-[11px] text-white/90 mt-3 font-semibold">
-                    Using local categories right now
-                  </p>
-                )}
               </div>
 
               <div className="hidden sm:flex w-14 h-14 rounded-2xl bg-white/15 items-center justify-center text-white">
@@ -202,7 +197,6 @@ const CategoriesView: React.FC<CategoriesViewProps> = ({
         </div>
       </div>
 
-      {/* Search */}
       <div className="px-4 mt-4">
         <div className="rounded-[26px] bg-white border border-orange-100 shadow-sm p-3">
           <div className="relative">
@@ -249,7 +243,6 @@ const CategoriesView: React.FC<CategoriesViewProps> = ({
         </div>
       </div>
 
-      {/* Section title */}
       <div className="px-4 mt-5 mb-3 flex items-center justify-between">
         <div>
           <h3 className="text-lg font-extrabold text-gray-900">Popular Collections</h3>
@@ -268,7 +261,6 @@ const CategoriesView: React.FC<CategoriesViewProps> = ({
         )}
       </div>
 
-      {/* Categories Grid */}
       {filteredCategories.length > 0 ? (
         <div className="px-4 grid grid-cols-3 gap-4 mb-7">
           {filteredCategories.map((cat, index) => (
@@ -302,29 +294,38 @@ const CategoriesView: React.FC<CategoriesViewProps> = ({
             </button>
           ))}
         </div>
-      ) : (
-        searchTerm.trim() ? (
-          <div className="mx-4 mb-7 rounded-[28px] bg-white border border-orange-100 shadow-sm px-5 py-12 flex flex-col items-center justify-center text-center">
-            <div className="w-16 h-16 bg-orange-50 rounded-full flex items-center justify-center mb-4">
-              <svg className="w-8 h-8 text-orange-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-2">No categories found</h3>
-            <p className="text-sm text-gray-500 mb-5">
-              We couldn't find any categories matching "{searchTerm}"
-            </p>
-            <button
-              onClick={() => setSearchTerm('')}
-              className="px-6 py-3 bg-orange-500 text-white font-bold rounded-2xl text-sm shadow-sm active:scale-95 transition-all"
-            >
-              Clear Search
-            </button>
+      ) : searchTerm.trim() ? (
+        <div className="mx-4 mb-7 rounded-[28px] bg-white border border-orange-100 shadow-sm px-5 py-12 flex flex-col items-center justify-center text-center">
+          <div className="w-16 h-16 bg-orange-50 rounded-full flex items-center justify-center mb-4">
+            <svg className="w-8 h-8 text-orange-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
           </div>
-        ) : null
+          <h3 className="text-lg font-bold text-gray-900 mb-2">No categories found</h3>
+          <p className="text-sm text-gray-500 mb-5">
+            We couldn't find any categories matching "{searchTerm}"
+          </p>
+          <button
+            onClick={() => setSearchTerm('')}
+            className="px-6 py-3 bg-orange-500 text-white font-bold rounded-2xl text-sm shadow-sm active:scale-95 transition-all"
+          >
+            Clear Search
+          </button>
+        </div>
+      ) : (
+        <div className="mx-4 mb-7 rounded-[28px] bg-white border border-orange-100 shadow-sm px-5 py-12 flex flex-col items-center justify-center text-center">
+          <div className="w-16 h-16 bg-orange-50 rounded-full flex items-center justify-center mb-4">
+            <svg className="w-8 h-8 text-orange-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 7h18M6 12h12M9 17h6" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 mb-2">No categories available</h3>
+          <p className="text-sm text-gray-500">
+            The API returned no categories for this app.
+          </p>
+        </div>
       )}
 
-      {/* Promo banner wrapper */}
       <div className="px-4">
         <div className="rounded-[28px] overflow-hidden border border-orange-100 shadow-sm bg-white">
           <AdBanner
@@ -335,7 +336,6 @@ const CategoriesView: React.FC<CategoriesViewProps> = ({
         </div>
       </div>
 
-      {/* Suggested products */}
       {displayProducts.length > 0 && onProductClick && (
         <div className="mt-8">
           <div className="px-4 mb-3">
@@ -358,7 +358,6 @@ const CategoriesView: React.FC<CategoriesViewProps> = ({
         </div>
       )}
 
-      {/* Bottom CTA */}
       <div className="px-4 mt-10">
         <div className="rounded-[28px] bg-white border border-orange-100 shadow-sm px-5 py-8 text-center">
           <div className="w-14 h-1.5 bg-gradient-to-r from-orange-400 to-orange-600 rounded-full mx-auto mb-4" />
