@@ -47,7 +47,7 @@ const CategoriesView: React.FC<CategoriesViewProps> = ({
         console.log('🌐 Fetching categories from API: /api/categories?app=sound');
         
         // IMPORTANT: Always use the full URL with ?app=sound parameter
-        const response = await fetch('https://barakasonko.store/api/categories?app=sound', {
+        const response = await fetch('https://sonkosound.barakasonko.store/api/categories?app=sound', {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
