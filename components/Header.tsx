@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ICONS, COLORS } from '../constants';
+import { ICONS } from '../constants';
 import { Product } from '../types';
 
 interface HeaderProps {
   onMenuClick: () => void;
   onSearch: (query: string) => void;
   initialValue?: string;
-  onProductSelect?: (product: Product) => void; // This will trigger ProductDetailView
+  onProductSelect?: (product: Product) => void;
 }
 
 interface SearchSuggestion {
@@ -23,16 +23,20 @@ interface SearchSuggestion {
   discount?: number;
 }
 
-const Header: React.FC<HeaderProps> = ({ 
-  onMenuClick, 
-  onSearch, 
+const Header: React.FC<HeaderProps> = ({
+  onMenuClick,
+  onSearch,
   initialValue = '',
-  onProductSelect 
+  onProductSelect
 }) => {
   const [query, setQuery] = useState(initialValue);
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  const [activeTopTab, setActiveTopTab] = useState<'ai' | 'products' | 'manufacturers'>('products');
+  const [activeInsideTab, setActiveInsideTab] = useState<'sonko' | 'baraka'>('sonko');
+
   const searchRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -40,7 +44,6 @@ const Header: React.FC<HeaderProps> = ({
     setQuery(initialValue);
   }, [initialValue]);
 
-  // Handle click outside to close suggestions
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
@@ -52,53 +55,42 @@ const Header: React.FC<HeaderProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Check if a product is actually a microphone
   const isMicrophone = (product: SearchSuggestion): boolean => {
     const title = (product.title || product.name || '').toLowerCase();
     const category = (product.category_name || '').toLowerCase();
     const description = (product.description || '').toLowerCase();
-    
-    // Keywords that indicate it's a microphone
+
     const micKeywords = ['mic', 'microphone', 'maikrofoni', 'wireless mic', 'shure', 'mic wireless'];
-    
-    // Keywords that indicate it's NOT a microphone (false positives)
     const excludeKeywords = ['mic cable', 'mic stand', 'mic holder', 'wire', 'cable', 'stand', 'adapter'];
-    
-    // Check if it contains mic keywords
-    const hasMicKeyword = micKeywords.some(keyword => 
+
+    const hasMicKeyword = micKeywords.some(keyword =>
       title.includes(keyword) || category.includes(keyword) || description.includes(keyword)
     );
-    
-    // Check if it should be excluded
-    const shouldExclude = excludeKeywords.some(keyword => 
+
+    const shouldExclude = excludeKeywords.some(keyword =>
       title.includes(keyword) || category.includes(keyword) || description.includes(keyword)
     );
-    
-    // Also check if it's in the Mic category (category_id "3" from your API)
+
     const isMicCategory = product.category_id === "3" || category.includes('mic');
-    
+
     return (hasMicKeyword && !shouldExclude) || isMicCategory;
   };
 
-  // Filter suggestions based on search query
   const filterSuggestions = (products: SearchSuggestion[], searchQuery: string): SearchSuggestion[] => {
     const query_lower = searchQuery.toLowerCase();
-    
+
     return products.filter(product => {
       const title = (product.title || product.name || '').toLowerCase();
       const category = (product.category_name || '').toLowerCase();
-      
-      // If searching for "mic", use the microphone detector
+
       if (query_lower === 'mic' || query_lower === 'microphone' || query_lower === 'maikrofoni') {
         return isMicrophone(product);
       }
-      
-      // For other searches, do normal title/category matching
+
       return title.includes(query_lower) || category.includes(query_lower);
     });
   };
 
-  // Fetch search suggestions from the API
   useEffect(() => {
     const fetchSuggestions = async () => {
       const trimmedQuery = query.trim();
@@ -107,7 +99,6 @@ const Header: React.FC<HeaderProps> = ({
         return;
       }
 
-      // Cancel previous request
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
@@ -116,30 +107,28 @@ const Header: React.FC<HeaderProps> = ({
 
       try {
         setIsLoading(true);
-        
-        const response = await fetch(`https://barakasonko.store/api/products?search=${encodeURIComponent(trimmedQuery)}`, {
-          signal: abortControllerRef.current.signal
-        });
-        
+
+        const response = await fetch(
+          `https://barakasonko.store/api/products?search=${encodeURIComponent(trimmedQuery)}`,
+          { signal: abortControllerRef.current.signal }
+        );
+
         if (!response.ok) {
           throw new Error('Search failed');
         }
-        
+
         const data = await response.json();
-        
-        // Filter the results to show only relevant products
+
         if (data.success && Array.isArray(data.data)) {
           const filteredResults = filterSuggestions(data.data, trimmedQuery);
           setSuggestions(filteredResults);
         } else {
           setSuggestions([]);
         }
-        
+
         setShowSuggestions(true);
       } catch (error) {
-        if (error instanceof Error && error.name === 'AbortError') {
-          return; // Ignore abort errors
-        }
+        if (error instanceof Error && error.name === 'AbortError') return;
         console.error('Search error:', error);
         setSuggestions([]);
       } finally {
@@ -152,8 +141,7 @@ const Header: React.FC<HeaderProps> = ({
   }, [query]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setQuery(val);
+    setQuery(e.target.value);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -166,9 +154,8 @@ const Header: React.FC<HeaderProps> = ({
   const handleSuggestionClick = (suggestion: SearchSuggestion) => {
     setQuery(suggestion.title || suggestion.name || '');
     setShowSuggestions(false);
-    
+
     if (onProductSelect) {
-      // Convert to Product type that ProductDetailView expects
       const product: Product = {
         id: suggestion.id,
         name: suggestion.title || suggestion.name || 'Unknown Product',
@@ -182,30 +169,130 @@ const Header: React.FC<HeaderProps> = ({
         category_name: suggestion.category_name,
         description: suggestion.description,
         images: [suggestion.image].filter(Boolean),
-        // Add any other fields that Product type expects
       } as Product;
-      
-      // Call the parent handler which should open ProductDetailView
+
       onProductSelect(product);
     }
   };
 
+  const topTabs = [
+    { id: 'ai', label: 'AI Mode' },
+    { id: 'products', label: 'Products' },
+    { id: 'manufacturers', label: 'Manufacturers' },
+  ] as const;
+
+  const insideTabs = [
+    {
+      id: 'sonko',
+      label: 'Ndani ya Sonko Sound',
+      badge: 'Studio & Audio',
+    },
+    {
+      id: 'baraka',
+      label: 'Ndani ya Baraka Sonko',
+      badge: 'Store & Deals',
+    },
+  ] as const;
+
   return (
-    <header className="sticky top-0 z-50 bg-white shadow-sm w-full">
-      {/* Search bar section */}
-      <div className="px-3 py-3 flex items-center space-x-3">
-        <button 
-          onClick={onMenuClick} 
-          className="p-1 text-gray-600 active:bg-gray-100 rounded transition-colors"
-          aria-label="Menu"
-        >
-          <ICONS.Menu />
-        </button>
-        
-        <div className="relative flex-grow" ref={searchRef}>
-          <div className="flex items-center bg-gray-100 rounded-full overflow-hidden border border-gray-200 focus-within:border-orange-300 focus-within:ring-2 focus-within:ring-orange-50 transition-all">
-            <button 
-              className="pl-3 text-gray-400 hover:text-orange-500 transition-colors"
+    <header className="sticky top-0 z-50 w-full bg-white shadow-sm border-b border-gray-100">
+      <style>{`
+        @keyframes soundPulse {
+          0% { transform: scale(1); opacity: 0.65; }
+          50% { transform: scale(1.15); opacity: 1; }
+          100% { transform: scale(1); opacity: 0.65; }
+        }
+
+        @keyframes barDance {
+          0% { transform: scaleY(0.45); }
+          50% { transform: scaleY(1); }
+          100% { transform: scaleY(0.45); }
+        }
+
+        @keyframes fadeInSoft {
+          from { opacity: 0; transform: translateY(6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-sound-pulse {
+          animation: soundPulse 1.6s ease-in-out infinite;
+        }
+
+        .eq-bar-1 { animation: barDance 0.85s ease-in-out infinite; transform-origin: bottom; }
+        .eq-bar-2 { animation: barDance 1.05s ease-in-out infinite; transform-origin: bottom; }
+        .eq-bar-3 { animation: barDance 0.95s ease-in-out infinite; transform-origin: bottom; }
+
+        .animate-fadeIn {
+          animation: fadeInSoft 0.2s ease-out;
+        }
+
+        .hide-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+
+        .hide-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
+
+      {/* Top branding + search row */}
+      <div className="bg-gradient-to-r from-orange-500 via-orange-500 to-orange-600 px-3 pt-3 pb-3">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onMenuClick}
+            className="flex-shrink-0 p-2 rounded-full bg-white/15 text-white hover:bg-white/20 active:scale-95 transition-all"
+            aria-label="Menu"
+          >
+            <ICONS.Menu />
+          </button>
+
+          {/* Logo */}
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="relative flex-shrink-0 w-11 h-11 rounded-2xl bg-white shadow-md flex items-center justify-center overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-orange-100 to-white" />
+              <div className="relative z-10 flex items-center justify-center">
+                <div className="relative flex items-end gap-[3px] h-5 mr-1">
+                  <span className="eq-bar-1 w-[3px] h-3 rounded-full bg-orange-500" />
+                  <span className="eq-bar-2 w-[3px] h-5 rounded-full bg-orange-600" />
+                  <span className="eq-bar-3 w-[3px] h-4 rounded-full bg-orange-500" />
+                </div>
+
+                <div className="relative">
+                  <div className="w-4 h-4 rounded-full bg-orange-500 shadow-sm" />
+                  <span className="absolute -right-2 top-1/2 -translate-y-1/2 w-2 h-2 border-r-2 border-t-2 border-orange-400 rotate-45 rounded-sm animate-sound-pulse" />
+                </div>
+              </div>
+            </div>
+
+            <div className="min-w-0">
+              <p className="text-white font-extrabold text-[17px] leading-tight tracking-tight">
+                Sonko Sound
+              </p>
+              <p className="text-orange-100 text-[11px] leading-tight font-medium truncate">
+                Professional Audio & Smart Shopping
+              </p>
+            </div>
+          </div>
+
+          {/* Country flag */}
+          <div className="ml-auto flex-shrink-0">
+            <div className="w-8 h-8 rounded-full overflow-hidden border border-white/40 shadow-md bg-white">
+              <img
+                src="https://flagcdn.com/w40/tz.png"
+                alt="Tanzania"
+                className="w-full h-full object-cover scale-150"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Search */}
+        <div className="mt-3 relative" ref={searchRef}>
+          <div className="flex items-center bg-white rounded-full overflow-hidden border border-orange-100 shadow-sm focus-within:ring-2 focus-within:ring-white/40">
+            <button
+              className="pl-4 pr-2 text-orange-500 hover:text-orange-600 transition-colors"
               onClick={() => {
                 onSearch(query);
                 setShowSuggestions(false);
@@ -214,11 +301,11 @@ const Header: React.FC<HeaderProps> = ({
             >
               <ICONS.Search />
             </button>
-            
-            <input 
-              type="text" 
-              placeholder="Search for microphones, speakers, etc..."
-              className="w-full bg-transparent border-none py-2.5 px-2 text-sm outline-none placeholder-gray-400 font-medium"
+
+            <input
+              type="text"
+              placeholder="Search Sonko Sound products..."
+              className="w-full bg-transparent border-none py-3 px-1 text-sm outline-none placeholder-gray-400 font-medium text-gray-800"
               value={query}
               onChange={handleChange}
               onKeyDown={handleKeyDown}
@@ -226,11 +313,11 @@ const Header: React.FC<HeaderProps> = ({
               aria-label="Search products"
               autoComplete="off"
             />
-            
-            {query && (
-              <button 
-                onClick={() => { 
-                  setQuery(''); 
+
+            {query && !isLoading && (
+              <button
+                onClick={() => {
+                  setQuery('');
                   onSearch('');
                   setSuggestions([]);
                   setShowSuggestions(false);
@@ -241,49 +328,52 @@ const Header: React.FC<HeaderProps> = ({
                 &times;
               </button>
             )}
-            
+
             {isLoading && (
-              <div className="pr-3">
+              <div className="pr-4">
                 <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
               </div>
             )}
           </div>
 
-          {/* Search Suggestions Dropdown */}
+          {/* Suggestions */}
           {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 max-h-96 overflow-y-auto z-50 animate-fadeIn">
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 max-h-96 overflow-y-auto z-50 animate-fadeIn">
               <div className="py-2">
                 {suggestions.map((product) => (
                   <button
                     key={product.id}
                     onClick={() => handleSuggestionClick(product)}
-                    className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-3"
+                    className="w-full px-4 py-3 text-left hover:bg-orange-50/60 transition-colors flex items-center gap-3"
                   >
                     {product.image ? (
-                      <img 
-                        src={product.image} 
-                        alt={product.title || product.name} 
-                        className="w-12 h-12 object-cover rounded-lg"
+                      <img
+                        src={product.image}
+                        alt={product.title || product.name}
+                        className="w-12 h-12 object-cover rounded-xl border border-gray-100"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = 'https://via.placeholder.com/48?text=Product';
                         }}
                       />
                     ) : (
-                      <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">
+                      <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-gray-400">
                         <ICONS.Product className="w-6 h-6" />
                       </div>
                     )}
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900 line-clamp-2">
+
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 line-clamp-2 text-sm">
                         {product.title || product.name}
                       </p>
+
                       {product.price && (
                         <p className="text-sm text-orange-600 font-bold mt-1">
                           TSh {product.price.toLocaleString()}
                         </p>
                       )}
+
                       {product.category_name && (
-                        <p className="text-xs text-gray-400 mt-1">
+                        <p className="text-xs text-gray-400 mt-1 truncate">
                           {product.category_name}
                         </p>
                       )}
@@ -291,15 +381,14 @@ const Header: React.FC<HeaderProps> = ({
                   </button>
                 ))}
               </div>
-              
-              {/* View all results */}
+
               <div className="border-t border-gray-100 p-2">
                 <button
                   onClick={() => {
                     onSearch(query);
                     setShowSuggestions(false);
                   }}
-                  className="w-full py-2 text-center text-sm font-medium text-orange-500 hover:bg-orange-50 rounded-xl transition-colors"
+                  className="w-full py-2.5 text-center text-sm font-semibold text-orange-500 hover:bg-orange-50 rounded-xl transition-colors"
                 >
                   View all results for "{query}"
                 </button>
@@ -307,30 +396,80 @@ const Header: React.FC<HeaderProps> = ({
             </div>
           )}
 
-          {/* No results state */}
           {showSuggestions && query.trim().length >= 2 && !isLoading && suggestions.length === 0 && (
-            <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 animate-fadeIn">
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 animate-fadeIn">
               <div className="px-4 py-8 text-center">
-                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <ICONS.Search className="w-6 h-6 text-gray-300" />
+                <div className="w-16 h-16 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <ICONS.Search className="w-6 h-6 text-orange-300" />
                 </div>
-                <p className="text-gray-700 font-medium mb-1">No products found</p>
+                <p className="text-gray-700 font-semibold mb-1">No products found</p>
                 <p className="text-sm text-gray-400">Try different keywords</p>
               </div>
             </div>
           )}
         </div>
+      </div>
 
-        {/* Country flag */}
-        <div className="flex-shrink-0">
-          <div className="w-7 h-7 rounded-full overflow-hidden border border-gray-200 shadow-sm">
-            <img 
-              src="https://flagcdn.com/w40/tz.png" 
-              alt="Tanzania" 
-              className="w-full h-full object-cover scale-150"
-              loading="lazy"
-            />
+      {/* Main tabs like Alibaba */}
+      <div className="bg-white border-b border-gray-100">
+        <div className="overflow-x-auto hide-scrollbar">
+          <div className="flex items-center gap-7 px-4 min-w-max">
+            {topTabs.map((tab) => {
+              const isActive = activeTopTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTopTab(tab.id)}
+                  className={`relative py-3 text-[15px] font-semibold transition-colors ${
+                    isActive ? 'text-gray-900' : 'text-gray-500 hover:text-gray-800'
+                  }`}
+                >
+                  {tab.label}
+                  {isActive && (
+                    <span className="absolute left-0 right-0 bottom-0 h-[3px] rounded-full bg-orange-500" />
+                  )}
+                </button>
+              );
+            })}
           </div>
+        </div>
+      </div>
+
+      {/* Ndani ya Sonko Sound / Ndani ya Baraka Sonko row */}
+      <div className="bg-[#fffaf5] border-b border-orange-100 px-3 py-2">
+        <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar">
+          {insideTabs.map((tab) => {
+            const isActive = activeInsideTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveInsideTab(tab.id)}
+                className={`relative min-w-max rounded-2xl px-4 py-2.5 text-left transition-all border ${
+                  isActive
+                    ? 'bg-white border-orange-200 shadow-sm'
+                    : 'bg-transparent border-transparent hover:bg-white/70'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full ${
+                      tab.id === 'sonko' ? 'bg-orange-500' : 'bg-gray-700'
+                    }`}
+                  />
+                  <span className={`text-sm font-bold ${isActive ? 'text-gray-900' : 'text-gray-700'}`}>
+                    {tab.label}
+                  </span>
+                </div>
+                <p className={`mt-0.5 text-[11px] ${isActive ? 'text-orange-500' : 'text-gray-400'}`}>
+                  {tab.badge}
+                </p>
+
+                {isActive && (
+                  <span className="absolute inset-x-4 -bottom-[6px] h-[3px] rounded-full bg-orange-500" />
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
     </header>
