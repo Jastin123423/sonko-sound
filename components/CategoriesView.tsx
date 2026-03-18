@@ -43,7 +43,7 @@ const CategoriesView: React.FC<CategoriesViewProps> = ({
         setIsLoading(true);
         setError(null);
 
-        const response = await fetch('https://barakasonko.store/api/categories');
+        const response = await fetch('https://barakasonko.store/api/categories?app=sound');
 
         if (!response.ok) {
           throw new Error(`Failed to fetch categories: ${response.status}`);
