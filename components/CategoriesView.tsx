@@ -1,6 +1,5 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { CATEGORIES } from '../constants';
 import { Category, Product } from '../types';
 import ProductGrid from './ProductGrid';
 import AdBanner from './AdBanner';
