@@ -1,3 +1,6 @@
+let us make CategoriesView.tsx look more professional and different from this original , make it Unique but more advanced look in Albaba colours 
+
+
 import React, { useMemo, useState, useEffect } from 'react';
 import { CATEGORIES, COLORS } from '../constants';
 import { Category, Product } from '../types';
