@@ -1,13 +1,9 @@
-
-// App.tsx
+// Here App.tsx
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useParams, Navigate } from 'react-router-dom';
 import Header from './components/Header';
-import HeroBanner from './components/HeroBanner';
 import QuickActions from './components/QuickActions';
 import CategorySection from './components/CategorySection';
-import FlashSale from './components/FlashSale';
-import AdBanner from './components/AdBanner';
 import ProductGrid from './components/ProductGrid';
 import BottomNav from './components/BottomNav';
 import Sidebar from './components/Sidebar';
@@ -18,9 +14,53 @@ import CategoriesView from './components/CategoriesView';
 import AllProductsView from './components/AllProductsView';
 import { Product, User, Category, Comment } from './types';
 
-// ... (keep all your existing component definitions: WatermarkedImage, VideoPlayer, Banner, ErrorBoundary, helper functions, services exactly as they were)
+// Cache helpers
+const PRODUCTS_CACHE_KEY = 'sonko_sound_products_cache_v1';
+const CATEGORIES_CACHE_KEY = 'sonko_sound_categories_cache_v1';
+const CACHE_MAX_AGE = 1000 * 60 * 60 * 24 * 365; // 1 year
 
-// I'll include the full AppContent and App components - but note: you need to install react-router-dom first!
+type CachePayload<T> = {
+  timestamp: number;
+  data: T;
+};
+
+const saveToCache = <T,>(key: string, data: T) => {
+  try {
+    const payload: CachePayload<T> = {
+      timestamp: Date.now(),
+      data,
+    };
+    localStorage.setItem(key, JSON.stringify(payload));
+  } catch (error) {
+    console.error(`Failed to save cache for ${key}`, error);
+  }
+};
+
+const loadFromCache = <T,>(key: string, maxAge = CACHE_MAX_AGE): T | null => {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+
+    const parsed: CachePayload<T> = JSON.parse(raw);
+    if (!parsed || typeof parsed.timestamp !== 'number') return null;
+
+    const expired = Date.now() - parsed.timestamp > maxAge;
+    if (expired) {
+      localStorage.removeItem(key);
+      return null;
+    }
+
+    return parsed.data;
+  } catch (error) {
+    console.error(`Failed to load cache for ${key}`, error);
+    return null;
+  }
+};
+
+const clearStoreCache = () => {
+  localStorage.removeItem(PRODUCTS_CACHE_KEY);
+  localStorage.removeItem(CATEGORIES_CACHE_KEY);
+};
 
 /** Watermarked Image Component - For PRODUCT IMAGES only */
 const WatermarkedImage: React.FC<{
@@ -605,45 +645,12 @@ class ViewsService {
   }
 }
 
-// Banner data
-const banners = [
-  {
-    id: 1,
-    src: "https://media.barakasonko.store/Jipatie%20kwa%20bei%20poa.gif",
-    alt: "Get products at affordable prices",
-    duration: 5000,
-    isGif: true
-  },
-  {
-    id: 2,
-    src: "https://media.barakasonko.store/uploads/Yellow%20And%20Red%20Unboxing%20And%20Review%20YouTube%20Thumbnail.gif",
-    alt: "Product unboxing and review",
-    duration: 5000,
-    isGif: true
-  },
-  {
-    id: 3,
-    src: "https://media.barakasonko.store/Untitled%20design.gif",
-    alt: "Special promotions banner",
-    duration: 5000,
-    isGif: true
-  },
-  {
-    id: 4,
-    src: "https://media.barakasonko.store/Yellow%20And%20Red%20Unboxing%20And%20Review%20YouTube%20Thumbnail%20(1).gif",
-    alt: "Product boxing and review",
-    duration: 5000,
-    isGif: true
-  }
-];
-
 // Main App Content with Router hooks
 const AppContent: React.FC = () => {
   const navigate = useNavigate();
   const { productId } = useParams<{ productId: string }>();
   
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [activeBannerIndex, setActiveBannerIndex] = useState(0);
 
   const [view, setView] = useState<
     | 'home'
@@ -676,7 +683,7 @@ const AppContent: React.FC = () => {
   const [isRecordingView, setIsRecordingView] = useState<Record<string, boolean>>({});
 
   const [isLoading, setIsLoading] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>();
 
   // Simple right-click prevention for product images only
   useEffect(() => {
@@ -692,18 +699,6 @@ const AppContent: React.FC = () => {
     document.addEventListener('contextmenu', handleContextMenu);
     return () => document.removeEventListener('contextmenu', handleContextMenu);
   }, []);
-
-  // Banner rotation effect
-  useEffect(() => {
-    if (view !== 'home' || banners.length <= 1) return;
-    
-    const currentBanner = banners[activeBannerIndex];
-    const interval = setInterval(() => {
-      setActiveBannerIndex((prev) => (prev + 1) % banners.length);
-    }, currentBanner.duration);
-
-    return () => clearInterval(interval);
-  }, [activeBannerIndex, view]);
 
   // Transform backend product data - ensure product IDs are preserved
   const normalizeProduct = (p: any, categoriesList: Category[]): Product => {
@@ -782,23 +777,46 @@ const AppContent: React.FC = () => {
     } as any;
   };
 
-  // Fetch initial data
+  // Fetch initial data with cache
   useEffect(() => {
     const initApp = async () => {
       try {
         setIsLoading(true);
         setFetchError(null);
-        
+
+        // Try to load from cache first
+        const cachedCategories = loadFromCache<Category[]>(CATEGORIES_CACHE_KEY);
+        const cachedProducts = loadFromCache<Product[]>(PRODUCTS_CACHE_KEY);
+
+        if (cachedCategories && cachedProducts) {
+          setCategories(cachedCategories);
+          setProducts(cachedProducts);
+
+          const initialCounts: Record<string, number> = {};
+          const initialViewCounts: Record<string, number> = {};
+
+          cachedProducts.forEach(product => {
+            initialCounts[product.id] = 0;
+            initialViewCounts[product.id] = 0;
+          });
+
+          setCommentCounts(initialCounts);
+          setViewCounts(initialViewCounts);
+          setIsLoading(false);
+          return;
+        }
+
+        // No cache or expired, fetch from API
         const [prodRes, catRes] = await Promise.all([
-          fetch('/api/products'),
-          fetch('/api/categories'),
+          fetch('/api/products', { headers: { Accept: 'application/json' } }),
+          fetch('/api/categories?app=sound', { headers: { Accept: 'application/json' } }),
         ]);
 
         const prodData = await prodRes.json().catch(() => ({
           success: false,
           error: 'Invalid JSON from products API'
         }));
-        
+
         const catData = await catRes.json().catch(() => ({
           success: false,
           error: 'Invalid JSON from categories API'
@@ -809,30 +827,37 @@ const AppContent: React.FC = () => {
           const rawCats = Array.isArray(catData.data) ? catData.data : [];
           normalizedCats = rawCats.map(normalizeCategory);
           setCategories(normalizedCats);
+          saveToCache(CATEGORIES_CACHE_KEY, normalizedCats);
         } else {
-          setFetchError(prev => prev ? `${prev}; Categories: ${catData?.error}` : `Categories: ${catData?.error || 'Unknown error'}`);
+          setFetchError(prev =>
+            prev
+              ? `${prev}; Categories: ${catData?.error}`
+              : `Categories: ${catData?.error || 'Unknown error'}`
+          );
         }
 
         if (prodData?.success) {
           const raw = Array.isArray(prodData.data) ? prodData.data : [];
           const normalized = raw.map(p => normalizeProduct(p, normalizedCats));
           setProducts(normalized);
-          
-          // Initialize comment counts
+          saveToCache(PRODUCTS_CACHE_KEY, normalized);
+
           const initialCounts: Record<string, number> = {};
+          const initialViewCounts: Record<string, number> = {};
+
           normalized.forEach(product => {
             initialCounts[product.id] = 0;
-          });
-          setCommentCounts(initialCounts);
-          
-          // Initialize view counts
-          const initialViewCounts: Record<string, number> = {};
-          normalized.forEach(product => {
             initialViewCounts[product.id] = 0;
           });
+
+          setCommentCounts(initialCounts);
           setViewCounts(initialViewCounts);
         } else {
-          setFetchError(prev => prev ? `${prev}; Products: ${prodData?.error}` : `Products: ${prodData?.error || 'Unknown error'}`);
+          setFetchError(prev =>
+            prev
+              ? `${prev}; Products: ${prodData?.error}`
+              : `Products: ${prodData?.error || 'Unknown error'}`
+          );
         }
       } catch (error: any) {
         console.error('❌ App: Failed to initialize app', error);
@@ -1256,19 +1281,6 @@ const AppContent: React.FC = () => {
     }
   }, [selectedProduct?.id, isRecordingView]);
 
-  const handleBannerClick = () => {
-    setView('all-products');
-    navigate('/all-products');
-  };
-
-  const goToNextBanner = () => {
-    setActiveBannerIndex((prev) => (prev + 1) % banners.length);
-  };
-
-  const goToPrevBanner = () => {
-    setActiveBannerIndex((prev) => (prev - 1 + banners.length) % banners.length);
-  };
-
   // Admin session
   const [user, setUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('sonko_user');
@@ -1289,28 +1301,36 @@ const AppContent: React.FC = () => {
       if (!response.ok || !result?.success) return false;
 
       const savedRaw = result.data || result.product || result.item;
+
       if (savedRaw) {
         const saved = normalizeProduct(savedRaw, categories);
-        setProducts((prev) => [saved, ...prev]);
-        
+
+        setProducts((prev) => {
+          const updated = [saved, ...prev];
+          saveToCache(PRODUCTS_CACHE_KEY, updated);
+          return updated;
+        });
+
         setCommentCounts(prev => ({
           ...prev,
           [saved.id]: 0
         }));
-        
+
         setViewCounts(prev => ({
           ...prev,
           [saved.id]: 0
         }));
-        
+
         return true;
       }
 
       const prodRes = await fetch('/api/products');
       const prodData = await prodRes.json().catch(() => null);
+
       if (prodData?.success) {
-        const normalized = (prodData.data || []).map(p => normalizeProduct(p, categories));
+        const normalized = (prodData.data || []).map((p: any) => normalizeProduct(p, categories));
         setProducts(normalized);
+        saveToCache(PRODUCTS_CACHE_KEY, normalized);
       }
 
       return true;
@@ -1325,22 +1345,28 @@ const AppContent: React.FC = () => {
       const response = await fetch(`/api/products?id=${encodeURIComponent(String(id))}`, {
         method: 'DELETE',
       });
+
       const result = await response.json().catch(() => null);
+
       if (result?.success) {
-        setProducts((prev) => prev.filter((p) => String(p.id) !== String(id)));
-        
+        setProducts((prev) => {
+          const updated = prev.filter((p) => String(p.id) !== String(id));
+          saveToCache(PRODUCTS_CACHE_KEY, updated);
+          return updated;
+        });
+
         setProductComments(prev => {
           const newComments = { ...prev };
           delete newComments[id];
           return newComments;
         });
-        
+
         setCommentCounts(prev => {
           const newCounts = { ...prev };
           delete newCounts[id];
           return newCounts;
         });
-        
+
         setViewCounts(prev => {
           const newCounts = { ...prev };
           delete newCounts[id];
@@ -1378,6 +1404,11 @@ const AppContent: React.FC = () => {
   const handleBackToHome = () => {
     setView('home');
     navigate('/');
+  };
+
+  const handleRefreshCachedData = async () => {
+    clearStoreCache();
+    window.location.reload();
   };
 
   const navView =
@@ -1483,71 +1514,6 @@ const AppContent: React.FC = () => {
       <main className="w-full max-w-[600px] mx-auto pb-24">
         {view === 'home' ? (
           <>
-            <HeroBanner onClick={() => {
-              setView('all-products');
-              navigate('/all-products');
-            }} />
-
-            <div className="relative w-full overflow-hidden">
-              <div className="relative h-[350px]">
-                {banners.map((banner, index) => (
-                  <div
-                    key={banner.id}
-                    className={`absolute inset-0 transition-all duration-500 ease-in-out ${
-                      index === activeBannerIndex
-                        ? 'opacity-100 translate-x-0'
-                        : 'opacity-0 translate-x-full'
-                    }`}
-                  >
-                    <Banner
-                      src={banner.src}
-                      onClick={handleBannerClick}
-                      containerClass="h-[350px]"
-                      alt={banner.alt}
-                      isGif={true}
-                    />
-                  </div>
-                ))}
-              </div>
-
-              {banners.length > 1 && (
-                <>
-                  <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2">
-                    {banners.map((_, index) => (
-                      <button
-                        key={index}
-                        onClick={() => setActiveBannerIndex(index)}
-                        className={`w-2 h-2 rounded-full transition-all ${
-                          index === activeBannerIndex
-                            ? 'bg-orange-600 w-6'
-                            : 'bg-gray-300 hover:bg-gray-400'
-                        }`}
-                        aria-label={`Go to banner ${index + 1}`}
-                      />
-                    ))}
-                  </div>
-                  <button
-                    onClick={goToPrevBanner}
-                    className="absolute left-4 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-black/30 hover:bg-black/50 text-white rounded-full flex items-center justify-center transition-all backdrop-blur-sm"
-                    aria-label="Previous banner"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                      <path d="M15 18l-6-6 6-6" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={goToNextBanner}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-black/30 hover:bg-black/50 text-white rounded-full flex items-center justify-center transition-all backdrop-blur-sm"
-                    aria-label="Next banner"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                      <path d="M9 18l6-6-6-6" />
-                    </svg>
-                  </button>
-                </>
-              )}
-            </div>
-
             <QuickActions onActionSelect={() => {
               setView('all-products');
               navigate('/all-products');
@@ -1562,28 +1528,6 @@ const AppContent: React.FC = () => {
               }}
             />
 
-            {/* Flash Sale - with product images watermarked */}
-            <FlashSale
-              products={products}
-              onProductClick={handleProductClick}
-              onSeeAll={() => {
-                setView('all-products');
-                navigate('/all-products');
-              }}
-              WatermarkedImage={WatermarkedImage}
-            />
-
-            <div className="p-4">
-              <Banner
-                src="https://media.barakasonko.store/White%20Blue%20Professional%20Website%20Developer%20LinkedIn%20Banner.gif"
-                onClick={handleBannerClick}
-                containerClass="h-[110px]"
-                alt="Special promotion banner"
-                isGif={true}
-              />
-            </div>
-
-            {/* Daily Discoveries - with product images watermarked */}
             <ProductGrid
               title="Daily Discoveries"
               products={products}
