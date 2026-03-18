@@ -78,7 +78,7 @@ const WatermarkedImage: React.FC<{
   productId = '',
   isProduct = true
 }) => {
-  const logoUrl = "https://media.barakasonko.store/download__82_-removebg-preview.png";
+  const logoUrl = "https://media.barakasonko.store/Screenshot_2026-03-18_221011-removebg-preview.png";
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
 
@@ -90,9 +90,9 @@ const WatermarkedImage: React.FC<{
     if (!shouldWatermark) return { positions: [], opacities: [], sizes: [] };
     
     const patterns = [
-      { positions: ['bottom-right', 'top-left'], opacities: [0.6, 0.4], sizes: [30, 25] },
-      { positions: ['bottom-left', 'top-right'], opacities: [0.5, 0.5], sizes: [28, 28] },
-      { positions: ['center', 'bottom-right'], opacities: [0.4, 0.3], sizes: [35, 22] },
+      { positions: ['bottom-right', 'top-left'], opacities: [0.6, 0.4], sizes: [40, 35] },
+      { positions: ['bottom-left', 'top-right'], opacities: [0.5, 0.5], sizes: [38, 38] },
+      { positions: ['center', 'bottom-right'], opacities: [0.4, 0.3], sizes: [45, 32] },
     ];
     // Use a stable hash of productId to ensure consistent pattern
     const patternIndex = productId ? 
@@ -225,7 +225,7 @@ const WatermarkedImage: React.FC<{
             renderWatermark(pos, pattern.opacities[idx], pattern.sizes[idx])
           )}
           
-          {/* Copyright text for product images - keep original position */}
+          {/* Copyright text for product images - updated to Sonko Sound */}
           <div
             className="absolute bottom-2 left-2 px-2 py-0.5 rounded"
             style={{
@@ -237,7 +237,7 @@ const WatermarkedImage: React.FC<{
               zIndex: 21,
             }}
           >
-            ©barakasonko
+            ©SonkoSound
           </div>
         </div>
       )}
@@ -1424,16 +1424,77 @@ const AppContent: React.FC = () => {
       ? 'categories'
       : 'home';
 
+  // Updated loader with speaker design and SONKO SOUND branding
   if (isLoading && view !== 'category-results') {
     return (
-      <div className="fixed inset-0 bg-white flex flex-col items-center justify-center space-y-4">
-        <div className="text-3xl font-black italic text-orange-600 animate-pulse">SONKO</div>
-        <div className="flex space-x-1.5">
-          <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-          <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-          <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+      <div className="fixed inset-0 bg-gradient-to-br from-[#f7f7f7] via-white to-[#f3f3f3] flex items-center justify-center px-6 z-[999]">
+        <div className="relative flex flex-col items-center">
+          {/* Glow */}
+          <div className="absolute w-40 h-40 rounded-full bg-[#f26b2e]/10 blur-3xl animate-pulse" />
+
+          {/* Logo + Brand */}
+          <div className="relative flex flex-col items-center">
+            <div className="relative w-24 h-24 flex items-center justify-center">
+              {/* Outer ring */}
+              <div className="absolute inset-0 rounded-full border-[6px] border-[#f26b2e] opacity-95 animate-[spin_6s_linear_infinite]" />
+
+              {/* Inner speaker body */}
+              <div className="relative w-16 h-16 rounded-full bg-white shadow-[0_8px_30px_rgba(242,107,46,0.18)] border border-[#ececec] flex items-center justify-center">
+                <svg
+                  viewBox="0 0 64 64"
+                  className="w-9 h-9"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  {/* Speaker box */}
+                  <rect x="16" y="22" width="14" height="20" rx="3" fill="#f26b2e" />
+                  <path d="M30 27L40 20V44L30 37V27Z" fill="#f26b2e" />
+
+                  {/* Sound waves */}
+                  <path
+                    d="M44 25C47 27.5 49 31 49 32C49 33 47 36.5 44 39"
+                    stroke="#f26b2e"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M48 20C52 24 55 29 55 32C55 35 52 40 48 44"
+                    stroke="#cfcfcf"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+
+              {/* Animated sound bars */}
+              <div className="absolute -right-10 flex items-end gap-1 h-10">
+                <span className="w-1.5 rounded-full bg-[#f26b2e] animate-[soundBar_0.9s_ease-in-out_infinite]" />
+                <span className="w-1.5 rounded-full bg-[#f59a6a] animate-[soundBar_0.9s_ease-in-out_infinite_0.15s]" />
+                <span className="w-1.5 rounded-full bg-[#d9d9d9] animate-[soundBar_0.9s_ease-in-out_infinite_0.3s]" />
+              </div>
+            </div>
+
+            {/* Brand text */}
+            <div className="mt-6 text-center">
+              <h1 className="text-[34px] leading-none font-black tracking-[0.18em] text-[#f26b2e] drop-shadow-sm">
+                SONKO
+              </h1>
+              <p className="mt-2 text-[13px] font-extrabold tracking-[0.45em] text-[#cfcfcf]">
+                SOUND
+              </p>
+              <div className="mt-4 flex items-center justify-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-[#f26b2e] animate-bounce" />
+                <span className="w-2 h-2 rounded-full bg-[#f59a6a] animate-bounce [animation-delay:120ms]" />
+                <span className="w-2 h-2 rounded-full bg-[#d7d7d7] animate-bounce [animation-delay:240ms]" />
+              </div>
+              <p className="mt-4 text-xs font-semibold tracking-[0.18em] uppercase text-[#9c9c9c]">
+                Loading store data...
+              </p>
+            </div>
+          </div>
         </div>
-        <p className="text-xs text-gray-500 mt-4">Loading store data...</p>
       </div>
     );
   }
@@ -1652,9 +1713,9 @@ const AppContent: React.FC = () => {
         />
       )}
 
-      {/* Copyright Footer */}
+      {/* Copyright Footer - Updated to Sonko Sound */}
       <div className="fixed bottom-0 left-0 right-0 bg-black text-white text-center py-2 text-xs z-40">
-        ©barakasonko - Product images protected
+        ©SonkoSound - Product images protected
       </div>
     </div>
   );
