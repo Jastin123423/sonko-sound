@@ -1,4 +1,3 @@
-
 // Here App.tsx
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useParams, Navigate } from 'react-router-dom';
@@ -1419,9 +1418,18 @@ const AppContent: React.FC = () => {
     window.location.reload();
   };
 
+  // Handler for Barakasonko click
   const handleBarakasonkoClick = () => {
+    console.log('Barakasonko clicked - opening Barakasonko page');
     setView('barakasonko');
     navigate('/barakasonko');
+  };
+
+  // Handler for Sonko click (return to home)
+  const handleSonkoClick = () => {
+    console.log('Sonko clicked - returning to home');
+    setView('home');
+    navigate('/');
   };
 
   const navView =
@@ -1577,7 +1585,7 @@ const AppContent: React.FC = () => {
         onCategorySelect={handleCategorySelect}
       />
 
-      {/* Header */}
+      {/* Header - Updated with both click handlers */}
       {view !== 'product-detail' && (
         <Header
           onMenuClick={() => setIsSidebarOpen(true)}
@@ -1585,6 +1593,7 @@ const AppContent: React.FC = () => {
           initialValue={searchQuery}
           onProductSelect={handleProductClick}
           onBarakasonkoClick={handleBarakasonkoClick}
+          onSonkoClick={handleSonkoClick}
         />
       )}
 
@@ -1611,7 +1620,7 @@ const AppContent: React.FC = () => {
               }}
             />
 
-            {/* Flash Sale - RESTORED */}
+            {/* Flash Sale */}
             <FlashSale
               products={products}
               onProductClick={handleProductClick}
@@ -1746,7 +1755,7 @@ const AppContent: React.FC = () => {
         />
       )}
 
-      {/* Copyright Footer - Updated to Sonko Sound */}
+      {/* Copyright Footer */}
       <div className="fixed bottom-0 left-0 right-0 bg-black text-white text-center py-2 text-xs z-40">
         ©SonkoSound - Product images protected
       </div>
