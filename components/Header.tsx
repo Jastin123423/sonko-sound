@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ICONS } from '../constants';
 import { Product } from '../types';
-import { useNavigate } from 'react-router-dom';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -30,9 +29,8 @@ const Header: React.FC<HeaderProps> = ({
   onSearch,
   initialValue = '',
   onProductSelect,
-  onBarakasonkoClick // Add this prop
+  onBarakasonkoClick
 }) => {
-  const navigate = useNavigate();
   const [query, setQuery] = useState(initialValue);
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -58,21 +56,6 @@ const Header: React.FC<HeaderProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  // Handle tab navigation
-  useEffect(() => {
-    if (activeInsideTab === 'baraka') {
-      // Call the onBarakasonkoClick prop when baraka tab is active
-      if (onBarakasonkoClick) {
-        onBarakasonkoClick();
-      } else {
-        // Fallback to navigate directly if prop not provided
-        navigate('/barakasonko');
-      }
-    } else {
-      navigate('/');
-    }
-  }, [activeInsideTab, navigate, onBarakasonkoClick]);
 
   const isMicrophone = (product: SearchSuggestion): boolean => {
     const title = (product.title || product.name || '').toLowerCase();
@@ -213,19 +196,13 @@ const Header: React.FC<HeaderProps> = ({
     },
   ] as const;
 
-  // Handle tab click manually to ensure navigation works
   const handleInsideTabClick = (tabId: 'sonko' | 'baraka') => {
     setActiveInsideTab(tabId);
     
-    if (tabId === 'baraka') {
-      if (onBarakasonkoClick) {
-        onBarakasonkoClick();
-      } else {
-        navigate('/barakasonko');
-      }
-    } else {
-      navigate('/');
+    if (tabId === 'baraka' && onBarakasonkoClick) {
+      onBarakasonkoClick();
     }
+    // When 'sonko' is clicked, we don't navigate - it stays on home
   };
 
   return (
