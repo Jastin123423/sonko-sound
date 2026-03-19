@@ -322,7 +322,7 @@ const HeroBanner: React.FC<{
               </span>
             </div>
             <h1 className="text-3xl font-black text-white mb-2 leading-tight">
-              Sonko<br />Sound 
+              🔊Sonko Sound<br /> 
             </h1>
             <p className="text-orange-100 text-sm mb-4 max-w-xs">
              Pata Bidhaa Premium kama Bidhaa za Muziki na accessories Nyingine Ndani ya Sonko Sound.
