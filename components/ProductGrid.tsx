@@ -98,7 +98,7 @@ const ProductCard: React.FC<{ product: Product; onClick: () => void }> = ({ prod
 ================================= */
 
 const API_LIMIT = 2000;
-const API_URL = '/api/products';
+const API_URL = '/api/products?app=sound';
 
 const safeProductId = (p: any, idx: number) =>
   String(p?.id ?? p?.product_id ?? p?.slug ?? `idx-${idx}`);
