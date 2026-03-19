@@ -416,7 +416,7 @@ const CategoriesView: React.FC<CategoriesViewProps> = ({
       <div className="px-4">
         <div className="rounded-[28px] overflow-hidden border border-orange-100 shadow-sm bg-white">
           <AdBanner
-            src="https://media.barakasonko.store/White%20Blue%20Professional%20Website%20Developer%20LinkedIn%20Banner.gif"
+            
             onClick={onShowAllProducts}
             containerClass="h-[120px]"
           />
