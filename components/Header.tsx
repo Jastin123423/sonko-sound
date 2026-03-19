@@ -7,7 +7,8 @@ interface HeaderProps {
   onSearch: (query: string) => void;
   initialValue?: string;
   onProductSelect?: (product: Product) => void;
-  onBarakasonkoClick?: () => void; // Add this prop
+  onBarakasonkoClick?: () => void;
+  onSonkoClick?: () => void; // Add this prop for Sonko tab
 }
 
 interface SearchSuggestion {
@@ -29,7 +30,8 @@ const Header: React.FC<HeaderProps> = ({
   onSearch,
   initialValue = '',
   onProductSelect,
-  onBarakasonkoClick
+  onBarakasonkoClick,
+  onSonkoClick // Add this prop
 }) => {
   const [query, setQuery] = useState(initialValue);
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
@@ -201,8 +203,9 @@ const Header: React.FC<HeaderProps> = ({
     
     if (tabId === 'baraka' && onBarakasonkoClick) {
       onBarakasonkoClick();
+    } else if (tabId === 'sonko' && onSonkoClick) {
+      onSonkoClick(); // Call the sonko click handler
     }
-    // When 'sonko' is clicked, we don't navigate - it stays on home
   };
 
   return (
