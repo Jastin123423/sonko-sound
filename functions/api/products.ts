@@ -1,4 +1,4 @@
-// functions/api/products.ts
+
 import type { PagesFunction } from '@cloudflare/workers-types';
 
 type Env = { DB: D1Database };
@@ -18,9 +18,22 @@ const json = (data: any, status = 200) =>
 export const onRequestOptions: PagesFunction = async () =>
   new Response(null, { status: 204, headers: cors });
 
-// ✅ DEFAULT PRODUCT VIDEO
+// Default product video
 const DEFAULT_VIDEO_URL =
   'https://media.barakasonko.store/uploads/Facebook_1770123707890(720p).mp4';
+
+// Sound app allowed categories
+const SOUND_CATEGORY_NAMES = [
+  'Spika',
+  'Mic',
+  'Subwoofer',
+  'TV',
+  'Guitars',
+  'Keyboards',
+  'Hon Speaker',
+  'Studio Accessories',
+  'Mixers',
+];
 
 const safeJsonParseArray = (v: any): string[] => {
   if (!v) return [];
@@ -79,9 +92,7 @@ const safeJsonParseImageVariants = (v: any): ImageVariant[] => {
 
 const pickFirstUrl = (arr: string[]): string => (arr && arr.length ? String(arr[0]) : '');
 
-const genId = () => {
-  return `p_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-};
+const genId = () => `p_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 
 const buildProductResponse = (row: any) => {
   const imagesArr = safeJsonParseArray(row.images);
@@ -152,6 +163,16 @@ const getProductById = async (env: Env, id: string) => {
   )
     .bind(id)
     .first<any>();
+};
+
+const getAllowedSoundCategoryIds = async (env: Env): Promise<string[]> => {
+  const placeholders = SOUND_CATEGORY_NAMES.map(() => '?').join(', ');
+  const { results } = await env.DB
+    .prepare(`SELECT id FROM categories WHERE name IN (${placeholders})`)
+    .bind(...SOUND_CATEGORY_NAMES)
+    .all<any>();
+
+  return (results || []).map((row: any) => String(row.id));
 };
 
 const normalizeIncomingProduct = (body: any, existing?: any) => {
@@ -293,33 +314,95 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, request }) => {
     if (!env.DB) return json({ success: false, error: 'DB binding missing (DB)' }, 500);
 
     const url = new URL(request.url);
-    const id = url.searchParams.get('id');
+    const id = String(url.searchParams.get('id') || '').trim();
+    const app = String(url.searchParams.get('app') || '').trim().toLowerCase();
     const limit = Math.min(Math.max(Number(url.searchParams.get('limit') || 200), 1), 500);
 
-    if (id) {
-      const row = await getProductById(env, id);
-      if (!row) return json({ success: false, error: 'Not found' }, 404);
+    let allowedCategoryIds: string[] = [];
 
+    if (app === 'sound') {
+      allowedCategoryIds = await getAllowedSoundCategoryIds(env);
+    }
+
+    if (id) {
+      let query = `
+        SELECT
+          id, title, image, images, description_images, video_url,
+          price, original_price, discount, sold_count, order_count, rating,
+          category_id, category_name, status, created_at, updated_at,
+          description, image_variants
+        FROM products
+        WHERE id = ?
+      `;
+      const binds: any[] = [id];
+
+      if (app === 'sound') {
+        if (!allowedCategoryIds.length) {
+          return json({ success: false, error: 'Not found' }, 404);
+        }
+
+        const idPlaceholders = allowedCategoryIds.map(() => '?').join(', ');
+        const namePlaceholders = SOUND_CATEGORY_NAMES.map(() => '?').join(', ');
+
+        query += ` AND (
+          category_id IN (${idPlaceholders})
+          OR category_name IN (${namePlaceholders})
+        )`;
+
+        binds.push(...allowedCategoryIds, ...SOUND_CATEGORY_NAMES);
+      }
+
+      const row = await env.DB.prepare(query).bind(...binds).first<any>();
+
+      if (!row) return json({ success: false, error: 'Not found' }, 404);
       return json({ success: true, data: buildProductResponse(row) });
     }
 
-    const { results } = await env.DB.prepare(
-      `
+    let query = `
       SELECT
         id, title, image, images, description_images, video_url,
         price, original_price, discount, sold_count, order_count, rating,
         category_id, category_name, status, created_at, updated_at,
         description, image_variants
       FROM products
-      ORDER BY datetime(created_at) DESC
-      LIMIT ?
-      `
-    )
-      .bind(limit)
-      .all<any>();
+    `;
+    const binds: any[] = [];
 
+    if (app === 'sound') {
+      if (!allowedCategoryIds.length) {
+        return json({
+          success: true,
+          app,
+          filtered: true,
+          count: 0,
+          data: [],
+        });
+      }
+
+      const idPlaceholders = allowedCategoryIds.map(() => '?').join(', ');
+      const namePlaceholders = SOUND_CATEGORY_NAMES.map(() => '?').join(', ');
+
+      query += ` WHERE (
+        category_id IN (${idPlaceholders})
+        OR category_name IN (${namePlaceholders})
+      )`;
+
+      binds.push(...allowedCategoryIds, ...SOUND_CATEGORY_NAMES);
+    }
+
+    query += ` ORDER BY datetime(created_at) DESC LIMIT ?`;
+    binds.push(limit);
+
+    const { results } = await env.DB.prepare(query).bind(...binds).all<any>();
     const list = (results || []).map((row: any) => buildProductResponse(row));
-    return json({ success: true, data: list });
+
+    return json({
+      success: true,
+      app,
+      filtered: app === 'sound',
+      count: list.length,
+      data: list,
+    });
   } catch (e: any) {
     console.error('GET /api/products error', e);
     return json({ success: false, error: e?.message || 'Server error' }, 500);
