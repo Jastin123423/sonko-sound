@@ -3,7 +3,6 @@ import { Product } from '../types';
 
 // Define props interface
 interface BarakasonkoProps {
-  products: Product[];
   onProductClick: (product: Product) => void;
   WatermarkedImage: React.FC<any>;
 }
@@ -276,17 +275,55 @@ const SimpleProductGrid: React.FC<{
 
 /**
  * ==========================================================
- * ✅ Main Barakasonko Component
+ * ✅ Main Barakasonko Component - NOW FETCHES ITS OWN PRODUCTS
  * ==========================================================
  */
 const Barakasonko: React.FC<BarakasonkoProps> = ({
-  products,
   onProductClick,
   WatermarkedImage = DefaultWatermarkedImage
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'price-low' | 'price-high' | 'popular'>('newest');
   const [searchTerm, setSearchTerm] = useState('');
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch products from API
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        console.log('Barakasonko: Fetching products from /api/products');
+        const response = await fetch('/api/products', {
+          headers: { Accept: 'application/json' }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success && Array.isArray(data.data)) {
+          console.log(`Barakasonko: Loaded ${data.data.length} products`);
+          setProducts(data.data);
+        } else {
+          throw new Error(data?.error || 'Invalid response format');
+        }
+      } catch (error: any) {
+        console.error('Barakasonko: Failed to fetch products', error);
+        setError(error.message || 'Failed to load products');
+        setProducts([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchProducts();
+  }, []);
 
   // Ensure products is an array
   const safeProducts = useMemo(() => {
@@ -350,12 +387,48 @@ const Barakasonko: React.FC<BarakasonkoProps> = ({
   }, [filteredProducts]);
 
   // Loading state
-  if (!safeProducts.length) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-white via-orange-50/10 to-amber-50/10 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading products...</p>
+          <p className="text-gray-600">Loading Baraka Sonko products...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-white via-orange-50/10 to-amber-50/10 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl p-8 max-w-md text-center shadow-xl border border-red-100">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-red-500 text-2xl">!</span>
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 mb-2">Failed to load products</h3>
+          <p className="text-sm text-gray-500 mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-2 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // No products state
+  if (!safeProducts.length) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-white via-orange-50/10 to-amber-50/10 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl p-8 max-w-md text-center shadow-xl">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-gray-400 text-2xl">📦</span>
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 mb-2">No products available</h3>
+          <p className="text-sm text-gray-500">Check back later for new arrivals</p>
         </div>
       </div>
     );
