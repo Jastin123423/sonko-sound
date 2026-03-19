@@ -94,39 +94,24 @@ const AdminView: React.FC<AdminViewProps> = ({
     return matchesCategory && matchesSearch;
   });
 
-  // Alibaba color palette
-  const colors = {
-    primary: '#FF6A00', // Alibaba orange
-    secondary: '#FF8A3C', // Lighter orange
-    dark: '#1C1F2A', // Dark blue-gray
-    gray: '#6B7280',
-    lightGray: '#F3F4F6',
-    white: '#FFFFFF',
-    success: '#10B981',
-    danger: '#EF4444',
-    border: '#E5E7EB'
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#F9FAFB] to-[#F3F4F6]">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-gradient-to-r from-[#1C1F2A] to-[#2A2F3C] text-white shadow-lg">
+    <div className="min-h-screen bg-gradient-to-b from-[#FFF4E8] to-[#FFE4D6]">
+      {/* Header with Alibaba orange gradient */}
+      <div className="sticky top-0 z-10 bg-gradient-to-r from-[#FF6A00] to-[#FF8533] text-white shadow-lg">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-[#FF6A00] to-[#FF8A3C] rounded-xl flex items-center justify-center shadow-lg">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
+              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                <span className="text-white text-xl font-bold">SS</span>
               </div>
               <div>
-                <h1 className="text-xl font-bold tracking-tight">Product Manager</h1>
-                <p className="text-xs text-gray-300">Sonko Sound Admin Panel</p>
+                <h1 className="text-xl font-bold tracking-tight">Admin Dashboard</h1>
+                <p className="text-xs text-orange-100">Sonko Sound Management</p>
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              <span className="px-3 py-1 bg-[#FF6A00]/20 rounded-full text-xs font-semibold text-[#FF6A00] border border-[#FF6A00]/30">
-                {filteredProducts.length} Products
+              <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-semibold backdrop-blur-sm border border-white/30">
+                ©SonkoSound
               </span>
             </div>
           </div>
@@ -135,178 +120,176 @@ const AdminView: React.FC<AdminViewProps> = ({
 
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="grid lg:grid-cols-3 gap-6">
-          {/* Left Column - Add Product Form */}
+          {/* Left Column - Add Product Form - Keep original layout */}
           <div className="lg:col-span-1">
-            <div className="sticky top-24">
-              <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
-                <div className="bg-gradient-to-r from-[#1C1F2A] to-[#2A2F3C] px-5 py-4">
-                  <h2 className="text-white font-semibold flex items-center space-x-2">
-                    <svg className="w-5 h-5 text-[#FF6A00]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>Add New Product</span>
-                  </h2>
-                </div>
+            <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-orange-100">
+              <div className="bg-gradient-to-r from-[#FF6A00] to-[#FF8533] px-5 py-4">
+                <h2 className="text-white font-semibold flex items-center space-x-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>Add New Product</span>
+                </h2>
+              </div>
 
-                <form onSubmit={handleSubmit} className="p-5 space-y-4">
-                  <div className="space-y-4">
+              <form onSubmit={handleSubmit} className="p-5 space-y-4">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                      Product Title
+                    </label>
+                    <input
+                      type="text"
+                      name="title"
+                      value={newProduct.title}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 bg-orange-50/30 border border-orange-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6A00]/20 focus:border-[#FF6A00] transition-all"
+                      placeholder="e.g., Wireless Speaker Pro"
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                        Product Title
+                        Price (TZS)
                       </label>
                       <input
-                        type="text"
-                        name="title"
-                        value={newProduct.title}
+                        type="number"
+                        name="price"
+                        value={newProduct.price}
                         onChange={handleInputChange}
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6A00]/20 focus:border-[#FF6A00] transition-all"
-                        placeholder="e.g., Wireless Speaker Pro"
+                        className="w-full px-4 py-3 bg-orange-50/30 border border-orange-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6A00]/20 focus:border-[#FF6A00] transition-all"
+                        placeholder="0"
+                        min="0"
                         required
                       />
                     </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                          Price (TZS)
-                        </label>
-                        <input
-                          type="number"
-                          name="price"
-                          value={newProduct.price}
-                          onChange={handleInputChange}
-                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6A00]/20 focus:border-[#FF6A00] transition-all"
-                          placeholder="0"
-                          min="0"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                          Discount %
-                        </label>
-                        <input
-                          type="number"
-                          name="discount"
-                          value={newProduct.discount}
-                          onChange={handleInputChange}
-                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6A00]/20 focus:border-[#FF6A00] transition-all"
-                          placeholder="0"
-                          min="0"
-                          max="100"
-                        />
-                      </div>
-                    </div>
-
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                        Category
-                      </label>
-                      <select
-                        name="category"
-                        value={newProduct.category}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6A00]/20 focus:border-[#FF6A00] transition-all appearance-none"
-                        required
-                      >
-                        <option value="">Select category</option>
-                        {categories.map(cat => (
-                          <option key={cat.id} value={cat.name}>{cat.name}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                        Main Image URL
+                        Discount %
                       </label>
                       <input
-                        type="url"
-                        name="image"
-                        value={newProduct.image}
+                        type="number"
+                        name="discount"
+                        value={newProduct.discount}
                         onChange={handleInputChange}
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6A00]/20 focus:border-[#FF6A00] transition-all"
-                        placeholder="https://..."
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                        Additional Images (comma separated)
-                      </label>
-                      <input
-                        type="text"
-                        value={newProduct.images?.join(', ')}
-                        onChange={(e) => handleArrayInputChange(e, 'images')}
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6A00]/20 focus:border-[#FF6A00] transition-all"
-                        placeholder="url1, url2, url3"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                        Video URL (optional)
-                      </label>
-                      <input
-                        type="url"
-                        name="videoUrl"
-                        value={newProduct.videoUrl}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6A00]/20 focus:border-[#FF6A00] transition-all"
-                        placeholder="https://..."
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                        Description
-                      </label>
-                      <textarea
-                        name="description"
-                        value={newProduct.description}
-                        onChange={handleInputChange}
-                        rows={3}
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6A00]/20 focus:border-[#FF6A00] transition-all resize-none"
-                        placeholder="Product description..."
+                        className="w-full px-4 py-3 bg-orange-50/30 border border-orange-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6A00]/20 focus:border-[#FF6A00] transition-all"
+                        placeholder="0"
+                        min="0"
+                        max="100"
                       />
                     </div>
                   </div>
 
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="w-full bg-gradient-to-r from-[#FF6A00] to-[#FF8A3C] text-white font-semibold py-3 rounded-xl hover:from-[#FF8A3C] hover:to-[#FF6A00] transition-all duration-300 shadow-lg shadow-[#FF6A00]/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <span>Adding...</span>
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                        <span>Add Product</span>
-                      </>
-                    )}
-                  </button>
-                </form>
-              </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                      Category
+                    </label>
+                    <select
+                      name="category"
+                      value={newProduct.category}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 bg-orange-50/30 border border-orange-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6A00]/20 focus:border-[#FF6A00] transition-all appearance-none"
+                      required
+                    >
+                      <option value="">Select category</option>
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.name}>{cat.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                      Main Image URL
+                    </label>
+                    <input
+                      type="url"
+                      name="image"
+                      value={newProduct.image}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 bg-orange-50/30 border border-orange-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6A00]/20 focus:border-[#FF6A00] transition-all"
+                      placeholder="https://..."
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                      Additional Images (comma separated)
+                    </label>
+                    <input
+                      type="text"
+                      value={newProduct.images?.join(', ')}
+                      onChange={(e) => handleArrayInputChange(e, 'images')}
+                      className="w-full px-4 py-3 bg-orange-50/30 border border-orange-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6A00]/20 focus:border-[#FF6A00] transition-all"
+                      placeholder="url1, url2, url3"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                      Video URL (optional)
+                    </label>
+                    <input
+                      type="url"
+                      name="videoUrl"
+                      value={newProduct.videoUrl}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 bg-orange-50/30 border border-orange-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6A00]/20 focus:border-[#FF6A00] transition-all"
+                      placeholder="https://..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                      Description
+                    </label>
+                    <textarea
+                      name="description"
+                      value={newProduct.description}
+                      onChange={handleInputChange}
+                      rows={3}
+                      className="w-full px-4 py-3 bg-orange-50/30 border border-orange-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6A00]/20 focus:border-[#FF6A00] transition-all resize-none"
+                      placeholder="Product description..."
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full bg-gradient-to-r from-[#FF6A00] to-[#FF8533] text-white font-semibold py-3 rounded-xl hover:from-[#FF8533] hover:to-[#FF6A00] transition-all duration-300 shadow-lg shadow-[#FF6A00]/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Adding...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      <span>Add Product</span>
+                    </>
+                  )}
+                </button>
+              </form>
             </div>
           </div>
 
-          {/* Right Column - Product List */}
+          {/* Right Column - Product List - Keep original layout */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
-              <div className="bg-gradient-to-r from-[#1C1F2A] to-[#2A2F3C] px-5 py-4">
+            <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-orange-100">
+              <div className="bg-gradient-to-r from-[#FF6A00] to-[#FF8533] px-5 py-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
                   <h2 className="text-white font-semibold flex items-center space-x-2">
-                    <svg className="w-5 h-5 text-[#FF6A00]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                     </svg>
                     <span>Product Inventory</span>
@@ -319,9 +302,9 @@ const AdminView: React.FC<AdminViewProps> = ({
                         placeholder="Search products..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full sm:w-64 px-4 py-2 bg-gray-700 border border-gray-600 rounded-xl text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#FF6A00]/20 focus:border-[#FF6A00] transition-all"
+                        className="w-full sm:w-64 px-4 py-2 bg-white/20 border border-white/30 rounded-xl text-sm text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white/30 transition-all"
                       />
-                      <svg className="absolute right-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="absolute right-3 top-2.5 w-4 h-4 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                       </svg>
                     </div>
@@ -329,7 +312,7 @@ const AdminView: React.FC<AdminViewProps> = ({
                     <select
                       value={selectedCategory}
                       onChange={(e) => setSelectedCategory(e.target.value)}
-                      className="px-4 py-2 bg-gray-700 border border-gray-600 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#FF6A00]/20 focus:border-[#FF6A00] transition-all"
+                      className="px-4 py-2 bg-white/20 border border-white/30 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white/30 transition-all"
                     >
                       <option value="all">All Categories</option>
                       {categories.map(cat => (
@@ -340,13 +323,13 @@ const AdminView: React.FC<AdminViewProps> = ({
                 </div>
               </div>
 
-              <div className="divide-y divide-gray-100 max-h-[600px] overflow-y-auto">
+              <div className="divide-y divide-orange-100 max-h-[600px] overflow-y-auto">
                 {filteredProducts.length > 0 ? (
                   filteredProducts.map((product) => (
-                    <div key={product.id} className="p-4 hover:bg-gray-50 transition-colors group">
+                    <div key={product.id} className="p-4 hover:bg-orange-50/50 transition-colors group">
                       <div className="flex items-center space-x-4">
-                        {/* Product Image with Watermark */}
-                        <div className="w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden bg-gray-100 border border-gray-200 shadow-sm">
+                        {/* Product Image with Watermark - Using Sonko Sound watermark */}
+                        <div className="w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden bg-orange-50 border border-orange-100 shadow-sm">
                           <WatermarkedImage
                             src={product.image || ''}
                             alt={product.title}
@@ -399,8 +382,8 @@ const AdminView: React.FC<AdminViewProps> = ({
                   ))
                 ) : (
                   <div className="p-12 text-center">
-                    <div className="w-20 h-20 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                      <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="w-20 h-20 mx-auto bg-orange-50 rounded-full flex items-center justify-center mb-4">
+                      <svg className="w-10 h-10 text-[#FF6A00]/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                       </svg>
                     </div>
@@ -415,20 +398,9 @@ const AdminView: React.FC<AdminViewProps> = ({
               </div>
             </div>
 
-            {/* Sonko Sound Watermark Preview */}
-            <div className="mt-4 bg-white rounded-xl p-3 border border-gray-200 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#FF6A00] to-[#FF8A3C] flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">SS</span>
-                  </div>
-                  <span className="text-xs text-gray-500">©SonkoSound - Product images protected</span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-                  <span className="text-xs text-gray-400">Active</span>
-                </div>
-              </div>
+            {/* Sonko Sound watermark footer - Added without changing layout */}
+            <div className="mt-4 text-center">
+              <span className="text-xs text-gray-400">©SonkoSound - Product images protected</span>
             </div>
           </div>
         </div>
