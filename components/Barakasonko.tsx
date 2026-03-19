@@ -1,1774 +1,547 @@
-// Here App.tsx
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { BrowserRouter, Routes, Route, useNavigate, useParams, Navigate } from 'react-router-dom';
-import Header from './components/Header';
-import QuickActions from './components/QuickActions';
-import CategorySection from './components/CategorySection';
-import FlashSale from './components/FlashSale';
-import ProductGrid from './components/ProductGrid';
-import BottomNav from './components/BottomNav';
-import Sidebar from './components/Sidebar';
-import AdminView from './components/AdminView';
-import AuthView from './components/AuthView';
-import ProductDetailView from './components/ProductDetailView';
-import CategoriesView from './components/CategoriesView';
-import AllProductsView from './components/AllProductsView';
-import Barakasonko from './components/Barakasonko';
-import { Product, User, Category, Comment } from './types';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Product } from '../types';
 
-// Cache helpers
-const PRODUCTS_CACHE_KEY = 'sonko_sound_products_cache_v1';
-const CATEGORIES_CACHE_KEY = 'sonko_sound_categories_cache_v1';
-const CACHE_MAX_AGE = 1000 * 60 * 60 * 24 * 365; // 1 year
+// Define props interface
+interface BarakasonkoProps {
+  products: Product[];
+  onProductClick: (product: Product) => void;
+  WatermarkedImage: React.FC<any>;
+}
 
-type CachePayload<T> = {
-  timestamp: number;
-  data: T;
-};
-
-const saveToCache = <T,>(key: string, data: T) => {
-  try {
-    const payload: CachePayload<T> = {
-      timestamp: Date.now(),
-      data,
-    };
-    localStorage.setItem(key, JSON.stringify(payload));
-  } catch (error) {
-    console.error(`Failed to save cache for ${key}`, error);
-  }
-};
-
-const loadFromCache = <T,>(key: string, maxAge = CACHE_MAX_AGE): T | null => {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-
-    const parsed: CachePayload<T> = JSON.parse(raw);
-    if (!parsed || typeof parsed.timestamp !== 'number') return null;
-
-    const expired = Date.now() - parsed.timestamp > maxAge;
-    if (expired) {
-      localStorage.removeItem(key);
-      return null;
-    }
-
-    return parsed.data;
-  } catch (error) {
-    console.error(`Failed to load cache for ${key}`, error);
-    return null;
-  }
-};
-
-const clearStoreCache = () => {
-  localStorage.removeItem(PRODUCTS_CACHE_KEY);
-  localStorage.removeItem(CATEGORIES_CACHE_KEY);
-};
-
-/** Watermarked Image Component - For PRODUCT IMAGES only */
-const WatermarkedImage: React.FC<{
-  src: string;
-  alt?: string;
-  containerClass?: string;
-  onClick?: () => void;
-  productId?: string;
-  isProduct?: boolean;
-}> = ({ 
-  src, 
-  alt = '', 
-  containerClass = '', 
-  onClick, 
-  productId = '',
-  isProduct = true
-}) => {
-  const logoUrl = "https://media.barakasonko.store/Screenshot_2026-03-18_221011-removebg-preview.png";
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [hasError, setHasError] = useState(false);
-
-  // Only apply watermarks to product images, not banners
-  const shouldWatermark = isProduct;
-
-  // Generate unique watermark pattern for products
-  const getWatermarkPattern = () => {
-    if (!shouldWatermark) return { positions: [], opacities: [], sizes: [] };
-    
-    const patterns = [
-      { positions: ['bottom-right', 'top-left'], opacities: [0.6, 0.4], sizes: [40, 35] },
-      { positions: ['bottom-left', 'top-right'], opacities: [0.5, 0.5], sizes: [38, 38] },
-      { positions: ['center', 'bottom-right'], opacities: [0.4, 0.3], sizes: [45, 32] },
-    ];
-    // Use a stable hash of productId to ensure consistent pattern
-    const patternIndex = productId ? 
-      Math.abs(productId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % patterns.length : 
-      0;
-    return patterns[patternIndex];
-  };
-
-  const pattern = getWatermarkPattern();
-
-  const renderWatermark = (position: string, opacity: number, size: number) => {
-    const positions: Record<string, React.CSSProperties> = {
-      'bottom-right': { 
-        bottom: '10px', 
-        right: '10px', 
-        width: `${size}px`, 
-        height: `${size}px`,
-      },
-      'top-left': { 
-        top: '10px', 
-        left: '10px', 
-        width: `${size}px`, 
-        height: `${size}px`,
-      },
-      'top-right': { 
-        top: '10px', 
-        right: '10px', 
-        width: `${size}px`, 
-        height: `${size}px`,
-      },
-      'bottom-left': { 
-        bottom: '10px', 
-        left: '10px', 
-        width: `${size}px`, 
-        height: `${size}px`,
-      },
-      'center': { 
-        top: '50%', 
-        left: '50%', 
-        transform: 'translate(-50%, -50%)',
-        width: `${size * 1.5}px`, 
-        height: `${size * 1.5}px`,
-      },
-      'right-middle': { 
-        top: '50%', 
-        right: '10px', 
-        transform: 'translateY(-50%)',
-        width: `${size}px`, 
-        height: `${size}px`,
-      },
-    };
-
-    if (!positions[position]) return null;
-
-    return (
-      <div
-        key={position}
-        className="absolute pointer-events-none"
-        style={{
-          ...positions[position],
-          opacity,
-          filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.3))',
-          zIndex: 20,
-        }}
-      >
-        <img
-          src={logoUrl}
-          alt=""
-          className="w-full h-full object-contain"
-          draggable="false"
-          style={{ pointerEvents: 'none' }}
-        />
-      </div>
-    );
-  };
-
+// Simple WatermarkedImage wrapper in case it's not passed correctly
+const DefaultWatermarkedImage: React.FC<any> = ({ src, alt, containerClass, onClick, productId }) => {
   return (
-    <div
-      className={`relative overflow-hidden rounded-xl product-image-container ${containerClass}`}
+    <div 
+      className={`relative overflow-hidden rounded-xl ${containerClass || ''}`}
       onClick={onClick}
-      style={{
-        userSelect: 'none',
-        pointerEvents: onClick ? 'auto' : 'none',
-      }}
-      onContextMenu={(e) => {
-        if (shouldWatermark) {
-          e.preventDefault();
-        }
-      }}
     >
-      {/* Main image */}
       <img
         src={src}
-        alt={alt}
-        className="w-full h-full object-cover transition-opacity duration-300"
-        draggable="false"
-        loading="lazy"
-        style={{
-          pointerEvents: 'auto',
-          opacity: isLoaded ? 1 : 0,
-        }}
-        onLoad={() => {
-          setIsLoaded(true);
-        }}
-        onError={() => {
-          console.error('❌ Failed to load image:', src);
-          setHasError(true);
-        }}
-      />
-      
-      {/* Loading skeleton */}
-      {!isLoaded && !hasError && (
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse" style={{ zIndex: 1 }} />
-      )}
-      
-      {/* Error state */}
-      {hasError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-100" style={{ zIndex: 2 }}>
-          <div className="text-center p-4">
-            <div className="text-gray-400 text-3xl mb-2">🖼️</div>
-            <p className="text-xs text-gray-500">Image not available</p>
-          </div>
-        </div>
-      )}
-      
-      {/* Watermarks for PRODUCT images only - always render once loaded */}
-      {shouldWatermark && !hasError && (
-        <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 10 }}>
-          {pattern.positions.map((pos, idx) => 
-            renderWatermark(pos, pattern.opacities[idx], pattern.sizes[idx])
-          )}
-          
-          {/* Copyright text for product images - updated to Sonko Sound */}
-          <div
-            className="absolute bottom-2 left-2 px-2 py-0.5 rounded"
-            style={{
-              background: 'rgba(0,0,0,0.7)',
-              color: 'white',
-              fontSize: '9px',
-              fontWeight: 'bold',
-              opacity: 0.8,
-              zIndex: 21,
-            }}
-          >
-            ©SonkoSound
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-/** Video Player Component - For VIDEOS only */
-const VideoPlayer: React.FC<{
-  src: string;
-  containerClass?: string;
-  onClick?: () => void;
-  playInline?: boolean;
-  autoPlay?: boolean;
-  muted?: boolean;
-  loop?: boolean;
-  controls?: boolean;
-}> = ({ 
-  src, 
-  containerClass = '', 
-  onClick,
-  playInline = true,
-  autoPlay = false,
-  muted = true,
-  loop = true,
-  controls = false
-}) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [isPlaying, setIsPlaying] = useState(autoPlay);
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [hasError, setHasError] = useState(false);
-
-  const handlePlayPause = () => {
-    if (videoRef.current) {
-      if (videoRef.current.paused) {
-        videoRef.current.play().then(() => setIsPlaying(true));
-      } else {
-        videoRef.current.pause();
-        setIsPlaying(false);
-      }
-    }
-  };
-
-  return (
-    <div
-      className={`relative overflow-hidden rounded-xl ${containerClass}`}
-      onClick={onClick}
-      style={{
-        userSelect: 'none',
-        pointerEvents: onClick ? 'auto' : 'none',
-      }}
-    >
-      <video
-        ref={videoRef}
-        src={src}
+        alt={alt || 'Product'}
         className="w-full h-full object-cover"
-        playsInline={playInline}
-        autoPlay={autoPlay}
-        muted={muted}
-        loop={loop}
-        controls={controls}
-        preload="metadata"
-        onLoadedData={() => {
-          setIsLoaded(true);
-          setHasError(false);
+        loading="lazy"
+        onError={(e) => {
+          (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300?text=No+Image';
         }}
-        onError={() => {
-          console.error('Failed to load video:', src);
-          setHasError(true);
-        }}
-        onPlay={() => setIsPlaying(true)}
-        onPause={() => setIsPlaying(false)}
       />
-      
-      {/* Loading state */}
-      {!isLoaded && !hasError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900/10">
-          <div className="w-8 h-8 border-2 border-orange-600 border-t-transparent rounded-full animate-spin" />
-        </div>
-      )}
-      
-      {/* Error state */}
-      {hasError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900/90">
-          <div className="text-center text-white p-4">
-            <div className="text-3xl mb-2">⚠️</div>
-            <p className="text-sm">Video failed to load</p>
-          </div>
-        </div>
-      )}
-      
-      {/* Custom controls for autoplay videos */}
-      {!controls && isLoaded && !hasError && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            handlePlayPause();
-          }}
-          className="absolute bottom-3 right-3 w-8 h-8 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center transition-colors"
-          aria-label={isPlaying ? "Pause" : "Play"}
-        >
-          <span className="text-white text-sm">
-            {isPlaying ? '⏸️' : '▶️'}
-          </span>
-        </button>
-      )}
     </div>
   );
 };
 
-/** Banner Component - For GIF banners (no watermark) */
-const Banner: React.FC<{
-  src: string;
-  alt?: string;
-  containerClass?: string;
-  onClick?: () => void;
-  isGif?: boolean;
-}> = ({ 
-  src, 
-  alt = '', 
-  containerClass = '', 
-  onClick,
-  isGif = true
-}) => {
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [hasError, setHasError] = useState(false);
+/**
+ * ==========================================================
+ * ✅ Horizontal Scrollable Section with Alibaba Background Sheds
+ * ==========================================================
+ */
+const HorizontalScrollSection: React.FC<{
+  title: string;
+  products: Product[];
+  onProductClick: (product: Product) => void;
+  WatermarkedImage: React.FC<any>;
+}> = ({ title, products, onProductClick, WatermarkedImage }) => {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Check if it's a GIF
-  const isGifFile = src.toLowerCase().endsWith('.gif');
-
-  return (
-    <div
-      className={`relative overflow-hidden rounded-xl ${containerClass}`}
-      onClick={onClick}
-      style={{
-        userSelect: 'none',
-        pointerEvents: onClick ? 'auto' : 'none',
-      }}
-    >
-      {isGifFile ? (
-        // GIF Banner - use img tag with decoding="async"
-        <img
-          src={src}
-          alt={alt}
-          className="w-full h-full object-cover"
-          draggable="false"
-          loading="lazy"
-          decoding="async"
-          style={{
-            opacity: isLoaded ? 1 : 0,
-            transition: 'opacity 0.3s',
-          }}
-          onLoad={() => setIsLoaded(true)}
-          onError={() => {
-            console.error('Failed to load GIF:', src);
-            setHasError(true);
-          }}
-        />
-      ) : (
-        // Regular image banner
-        <img
-          src={src}
-          alt={alt}
-          className="w-full h-full object-cover"
-          draggable="false"
-          loading="lazy"
-          style={{
-            opacity: isLoaded ? 1 : 0,
-            transition: 'opacity 0.3s',
-          }}
-          onLoad={() => setIsLoaded(true)}
-          onError={() => {
-            console.error('Failed to load banner:', src);
-            setHasError(true);
-          }}
-        />
-      )}
-      
-      {/* Loading skeleton */}
-      {!isLoaded && !hasError && (
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse" />
-      )}
-      
-      {/* Error state */}
-      {hasError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
-          <div className="text-center p-4">
-            <div className="text-gray-400 text-3xl mb-2">🎬</div>
-            <p className="text-xs text-gray-500">Banner not available</p>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-/** Enhanced ErrorBoundary */
-class ErrorBoundary extends React.Component<
-  { children: React.ReactNode; title?: string },
-  { hasError: boolean; error?: any }
-> {
-  constructor(props: any) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-  static getDerivedStateFromError(error: any) {
-    return { hasError: true, error };
-  }
-  componentDidCatch(error: any, info: any) {
-    console.error('UI crashed:', error, info);
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="p-4">
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
-            <p className="font-black text-red-700">
-              {this.props.title || 'This screen crashed.'}
-            </p>
-            <p className="text-xs text-red-700 mt-2">
-              Open console to see full error.
-            </p>
-            <pre className="text-[11px] mt-3 whitespace-pre-wrap text-red-600">
-              {String(this.state.error)}
-            </pre>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
-// Helper functions
-const getDefaultCategoryIcon = (categoryName: string): string => {
-  const name = categoryName.toLowerCase();
-  
-  if (name.includes('phone') || name.includes('simu')) return '📱';
-  if (name.includes('tv') || name.includes('television')) return '📺';
-  if (name.includes('sound') || name.includes('sauti')) return '🔊';
-  if (name.includes('camera') || name.includes('kamera')) return '📷';
-  if (name.includes('laptop') || name.includes('kompyuta')) return '💻';
-  if (name.includes('game') || name.includes('mchezo')) return '🎮';
-  if (name.includes('watch') || name.includes('saa')) return '⌚';
-  if (name.includes('home') || name.includes('nyumba')) return '🏠';
-  if (name.includes('kitchen') || name.includes('jikoni')) return '🍳';
-  if (name.includes('car') || name.includes('gari')) return '🚗';
-  if (name.includes('health') || name.includes('afya')) return '❤️';
-  if (name.includes('book') || name.includes('kitabu')) return '📚';
-  if (name.includes('fashion') || name.includes('mitindo')) return '👕';
-  if (name.includes('all') || name.includes('zote')) return '🛒';
-  if (name.includes('electronics') || name.includes('umeme')) return '🔌';
-  if (name.includes('accessories') || name.includes('vifaa')) return '🛍️';
-  
-  return '🛒';
-};
-
-const normalizeCategory = (cat: any): Category => {
-  const backendIcon = cat.icon || cat.icon_name || cat.icon_emoji || cat.icon_url;
-  
-  return {
-    id: String(cat.id || cat._id || `cat_${Date.now()}_${Math.random()}`),
-    name: String(cat.name || cat.category_name || cat.title || 'Unnamed Category'),
-    icon: backendIcon || getDefaultCategoryIcon(cat.name || ''),
-    ...cat
-  };
-};
-
-// Comments API Service
-class CommentsService {
-  private static API_BASE = '/api/comments';
-  
-  static async fetchComments(productId: string): Promise<Comment[]> {
-    try {
-      const response = await fetch(`${this.API_BASE}?productId=${encodeURIComponent(productId)}`);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      
-      const data = await response.json();
-      if (data.success && Array.isArray(data.data)) {
-        return data.data.map((comment: any) => ({
-          id: String(comment.id || comment._id),
-          productId: String(comment.productId),
-          userId: String(comment.userId || comment.user_id || 'anonymous'),
-          userName: String(comment.userName || comment.user_name || 'Anonymous'),
-          userInitials: comment.userInitials || comment.user_initials || 'AN',
-          userColor: comment.userColor || comment.user_color || 'bg-blue-100',
-          textColor: comment.textColor || comment.text_color || 'text-blue-600',
-          content: String(comment.content || comment.comment || ''),
-          timestamp: comment.timestamp || comment.created_at || new Date().toISOString(),
-          likes: Number(comment.likes || comment.likes_count || 0),
-          isLiked: Boolean(comment.isLiked || comment.liked || false),
-        }));
-      }
-      return [];
-    } catch (error) {
-      console.error('Failed to fetch comments:', error);
-      return [];
-    }
-  }
-  
-  static async addComment(comment: Omit<Comment, 'id' | 'timestamp' | 'likes' | 'isLiked'>): Promise<Comment | null> {
-    try {
-      const response = await fetch(this.API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productId: comment.productId,
-          content: comment.content,
-          userId: comment.userId,
-          userName: comment.userName,
-          userInitials: comment.userInitials,
-          userColor: comment.userColor,
-          textColor: comment.textColor,
-        }),
+  const scroll = (direction: 'left' | 'right') => {
+    if (scrollContainerRef.current) {
+      const scrollAmount = 300;
+      const newScrollLeft = scrollContainerRef.current.scrollLeft + (direction === 'left' ? -scrollAmount : scrollAmount);
+      scrollContainerRef.current.scrollTo({
+        left: newScrollLeft,
+        behavior: 'smooth'
       });
-      
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      
-      const data = await response.json();
-      if (data.success && data.data) {
-        return {
-          id: String(data.data.id || data.data._id),
-          productId: String(data.data.productId),
-          userId: String(data.data.userId || 'anonymous'),
-          userName: String(data.data.userName || 'Anonymous'),
-          userInitials: data.data.userInitials || 'AN',
-          userColor: data.data.userColor || 'bg-blue-100',
-          textColor: data.data.textColor || 'text-blue-600',
-          content: String(data.data.content || ''),
-          timestamp: data.data.timestamp || data.data.created_at || new Date().toISOString(),
-          likes: 0,
-          isLiked: false,
-        };
-      }
-      return null;
-    } catch (error) {
-      console.error('Failed to add comment:', error);
-      return null;
-    }
-  }
-  
-  static async likeComment(commentId: string, userId: string): Promise<boolean> {
-    try {
-      const response = await fetch(`${this.API_BASE}/${commentId}/like`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId }),
-      });
-      
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      
-      const data = await response.json();
-      return data.success === true;
-    } catch (error) {
-      console.error('Failed to like comment:', error);
-      return false;
-    }
-  }
-  
-  static async deleteComment(commentId: string): Promise<boolean> {
-    try {
-      const response = await fetch(`${this.API_BASE}/${commentId}`, {
-        method: 'DELETE',
-      });
-      
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      
-      const data = await response.json();
-      return data.success === true;
-    } catch (error) {
-      console.error('Failed to delete comment:', error);
-      return false;
-    }
-  }
-}
-
-// Views API Service
-class ViewsService {
-  private static API_BASE = '/api/views';
-
-  static async getViews(productId: string): Promise<number> {
-    try {
-      const res = await fetch(`${this.API_BASE}?productId=${encodeURIComponent(productId)}`);
-      if (!res.ok) return 0;
-      const data = await res.json().catch(() => null);
-      return data?.success ? Number(data.data?.views ?? 0) : 0;
-    } catch {
-      return 0;
-    }
-  }
-
-  static async recordView(productId: string, viewerKey: string): Promise<number> {
-    try {
-      const res = await fetch(this.API_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId, viewerKey }),
-      });
-      if (!res.ok) return 0;
-      const data = await res.json().catch(() => null);
-      return data?.success ? Number(data.data?.views ?? 0) : 0;
-    } catch {
-      return 0;
-    }
-  }
-}
-
-// Main App Content with Router hooks
-const AppContent: React.FC = () => {
-  const navigate = useNavigate();
-  const { productId } = useParams<{ productId: string }>();
-  
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
-  const [view, setView] = useState<
-    | 'home'
-    | 'admin'
-    | 'product-detail'
-    | 'category-results'
-    | 'categories'
-    | 'search-results'
-    | 'all-products'
-    | 'barakasonko'
-  >('home');
-
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
-  const [categoryProducts, setCategoryProducts] = useState<Product[]>([]);
-  
-  // Category-Product mapping for accurate filtering
-  const [categoryProductMap, setCategoryProductMap] = useState<Record<string, Product[]>>({});
-
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  
-  // Comments state
-  const [productComments, setProductComments] = useState<Record<string, Comment[]>>({});
-  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
-  const [isLoadingComments, setIsLoadingComments] = useState<Record<string, boolean>>({});
-
-  // Views state
-  const [viewCounts, setViewCounts] = useState<Record<string, number>>({});
-  const [isRecordingView, setIsRecordingView] = useState<Record<string, boolean>>({});
-
-  const [isLoading, setIsLoading] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>();
-
-  // Simple right-click prevention for product images only
-  useEffect(() => {
-    const handleContextMenu = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      // Check if the clicked element or its parent is a product image container
-      const isProductImage = target.closest('.product-image-container') !== null;
-      if (isProductImage) {
-        e.preventDefault();
-      }
-    };
-
-    document.addEventListener('contextmenu', handleContextMenu);
-    return () => document.removeEventListener('contextmenu', handleContextMenu);
-  }, []);
-
-  // Transform backend product data - ensure product IDs are preserved
-  const normalizeProduct = (p: any, categoriesList: Category[]): Product => {
-    const id = String(p?.id ?? p?._id ?? '');
-    const price = Number(p?.price ?? 0);
-    const discount = p?.discount == null ? 0 : Number(p.discount);
-
-    let categoryId = String(p?.category_id ?? p?.categoryId ?? '').trim();
-    let categoryName = '';
-    let categoryIcon = '';
-
-    if (typeof p?.category === 'object' && p.category) {
-      categoryId = String(p.category.id ?? categoryId).trim();
-      categoryName = String(p.category.name ?? p.category.category_name ?? '').trim();
-      categoryIcon = String(
-        p.category.icon ?? p.category.icon_name ?? p.category.icon_emoji ?? ''
-      ).trim();
-    } else {
-      categoryName = String(
-        p?.category_name ??
-          p?.categoryName ??
-          p?.category ??
-          ''
-      ).trim();
-
-      const maybe = String(p?.category ?? '').trim();
-      if (!categoryId && /^\d+$/.test(maybe)) categoryId = maybe;
-    }
-
-    if ((!categoryName || categoryName === '0') && categoryId) {
-      const found = categoriesList.find(c => String(c.id) === String(categoryId));
-      if (found) {
-        categoryName = found.name;
-        categoryIcon = categoryIcon || found.icon || '';
-      }
-    }
-
-    const category = categoryName;
-
-    const getProductCategoryIcon = () => {
-      if (categoryIcon) return categoryIcon;
-      
-      const matchingCat = categoriesList.find(c => 
-        c.name.toLowerCase() === categoryName.toLowerCase() ||
-        c.name.toLowerCase() === category.toLowerCase()
-      );
-      
-      return matchingCat?.icon || getDefaultCategoryIcon(categoryName);
-    };
-
-    return {
-      ...p,
-      id,
-      price: Number.isFinite(price) ? price : 0,
-      discount: Number.isFinite(discount) ? discount : 0,
-      category,
-      categoryName,
-      categoryId: categoryId || undefined,
-      category_id: categoryId || undefined,
-      category_name: categoryName,
-      categoryIcon: getProductCategoryIcon(),
-      image: p?.image || p?.image_url || (Array.isArray(p?.images) ? p.images[0] : '') || '',
-      images: Array.isArray(p?.images)
-        ? p.images
-        : Array.isArray(p?.image_urls)
-        ? p.image_urls
-        : Array.isArray(p?.image_urls_json)
-        ? p.image_urls_json
-        : [],
-      descriptionImages: Array.isArray(p?.descriptionImages)
-        ? p.descriptionImages
-        : Array.isArray(p?.description_images)
-        ? p.description_images
-        : [],
-      videoUrl: String(p?.videoUrl ?? p?.video_url ?? ''),
-    } as any;
-  };
-
-  // Fetch initial data with cache - UPDATED to use /api/products?app=sound
-  useEffect(() => {
-    const initApp = async () => {
-      try {
-        setIsLoading(true);
-        setFetchError(null);
-
-        // Try to load from cache first
-        const cachedCategories = loadFromCache<Category[]>(CATEGORIES_CACHE_KEY);
-        const cachedProducts = loadFromCache<Product[]>(PRODUCTS_CACHE_KEY);
-
-        if (cachedCategories && cachedProducts) {
-          setCategories(cachedCategories);
-          setProducts(cachedProducts);
-
-          const initialCounts: Record<string, number> = {};
-          const initialViewCounts: Record<string, number> = {};
-
-          cachedProducts.forEach(product => {
-            initialCounts[product.id] = 0;
-            initialViewCounts[product.id] = 0;
-          });
-
-          setCommentCounts(initialCounts);
-          setViewCounts(initialViewCounts);
-          setIsLoading(false);
-          return;
-        }
-
-        // No cache or expired, fetch from API with ?app=sound parameter
-        const [prodRes, catRes] = await Promise.all([
-          fetch('/api/products?app=sound', { 
-            headers: { Accept: 'application/json' } 
-          }),
-          fetch('/api/categories?app=sound', { 
-            headers: { Accept: 'application/json' } 
-          }),
-        ]);
-
-        const prodData = await prodRes.json().catch(() => ({
-          success: false,
-          error: 'Invalid JSON from products API'
-        }));
-
-        const catData = await catRes.json().catch(() => ({
-          success: false,
-          error: 'Invalid JSON from categories API'
-        }));
-
-        let normalizedCats: Category[] = [];
-        if (catData?.success) {
-          const rawCats = Array.isArray(catData.data) ? catData.data : [];
-          normalizedCats = rawCats.map(normalizeCategory);
-          setCategories(normalizedCats);
-          saveToCache(CATEGORIES_CACHE_KEY, normalizedCats);
-        } else {
-          setFetchError(prev =>
-            prev
-              ? `${prev}; Categories: ${catData?.error}`
-              : `Categories: ${catData?.error || 'Unknown error'}`
-          );
-        }
-
-        if (prodData?.success) {
-          const raw = Array.isArray(prodData.data) ? prodData.data : [];
-          const normalized = raw.map(p => normalizeProduct(p, normalizedCats));
-          setProducts(normalized);
-          saveToCache(PRODUCTS_CACHE_KEY, normalized);
-
-          const initialCounts: Record<string, number> = {};
-          const initialViewCounts: Record<string, number> = {};
-
-          normalized.forEach(product => {
-            initialCounts[product.id] = 0;
-            initialViewCounts[product.id] = 0;
-          });
-
-          setCommentCounts(initialCounts);
-          setViewCounts(initialViewCounts);
-        } else {
-          setFetchError(prev =>
-            prev
-              ? `${prev}; Products: ${prodData?.error}`
-              : `Products: ${prodData?.error || 'Unknown error'}`
-          );
-        }
-      } catch (error: any) {
-        console.error('❌ App: Failed to initialize app', error);
-        setFetchError(error.message || 'Network or server error');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initApp();
-  }, []);
-
-  // Handle direct product URL access
-  useEffect(() => {
-    if (productId && products.length > 0) {
-      const product = products.find(p => p.id === productId);
-      if (product) {
-        setSelectedProduct(product);
-        setView('product-detail');
-        
-        // Fetch comments for this product
-        fetchCommentsForProduct(product.id);
-        
-        // Record view
-        (async () => {
-          const viewerKey = getOrCreateUserId();
-          const newCount = await ViewsService.recordView(product.id, viewerKey);
-          setViewCounts(prev => ({ ...prev, [product.id]: newCount }));
-        })();
-      } else {
-        // Product not found, redirect to home
-        navigate('/', { replace: true });
-      }
-    }
-  }, [productId, products, navigate]);
-
-  // Build category-product map when data loads
-  const buildCategoryProductMap = useCallback(() => {
-    const map: Record<string, Product[]> = {};
-    
-    // Initialize empty arrays for all categories
-    categories.forEach(cat => {
-      map[cat.id] = [];
-    });
-    
-    // Also ensure "Bidhaa Zote" (id: "14") exists
-    if (!map["14"]) {
-      map["14"] = [];
-    }
-    
-    // Map each product to its category - preserve original product references
-    products.forEach(product => {
-      const productData = product as any;
-      
-      // Try multiple methods to find the correct category
-      let matchedCategoryId: string | null = null;
-      
-      // Method 1: Check by category_id field
-      if (productData.category_id) {
-        const catId = String(productData.category_id).trim();
-        if (map[catId]) {
-          matchedCategoryId = catId;
-        }
-      }
-      
-      // Method 2: Check by categoryId field
-      if (!matchedCategoryId && productData.categoryId) {
-        const catId = String(productData.categoryId).trim();
-        if (map[catId]) {
-          matchedCategoryId = catId;
-        }
-      }
-      
-      // Method 3: Match by category name
-      if (!matchedCategoryId) {
-        const productCatName = (
-          productData.category_name || 
-          productData.categoryName || 
-          productData.category || 
-          ''
-        ).toLowerCase().trim();
-        
-        const matchingCat = categories.find(cat => 
-          cat.name.toLowerCase().trim() === productCatName
-        );
-        
-        if (matchingCat) {
-          matchedCategoryId = matchingCat.id;
-        }
-      }
-      
-      // Method 4: Manual matching based on title keywords
-      if (!matchedCategoryId) {
-        const title = (productData.title || '').toLowerCase();
-        
-        // Mic category (id: "3")
-        if (title.includes('mic') || title.includes('microphone')) {
-          // Exclude accessories
-          if (!title.includes('cable') && !title.includes('wire') && 
-              !title.includes('stand') && !title.includes('stendi')) {
-            matchedCategoryId = "3";
-          }
-        }
-        
-        // Spika category (id: "2")
-        else if (title.includes('spika') || title.includes('speaker') || title.includes('sound')) {
-          matchedCategoryId = "2";
-        }
-        
-        // TV category (id: "6")
-        else if (title.includes('tv') || title.includes('television')) {
-          matchedCategoryId = "6";
-        }
-        
-        // Mobile accessories (id: "7")
-        else if (title.includes('charger') || title.includes('adapter') || 
-                 title.includes('cable') || title.includes('wire')) {
-          matchedCategoryId = "7";
-        }
-        
-        // TV accessories (id: "8")
-        else if (title.includes('tv stand') || title.includes('tv bracket') || 
-                 title.includes('tv stendi')) {
-          matchedCategoryId = "8";
-        }
-        
-        // Guitars (id: "9")
-        else if (title.includes('gitaa') || title.includes('guitar')) {
-          matchedCategoryId = "9";
-        }
-        
-        // Drums (id: "11")
-        else if (title.includes('tumba') || title.includes('drum') || 
-                 title.includes('manyanga') || title.includes('dufu')) {
-          matchedCategoryId = "11";
-        }
-        
-        // Mixers (id: "12")
-        else if (title.includes('mixer') || title.includes('mixing')) {
-          matchedCategoryId = "12";
-        }
-        
-        // Spares (id: "13")
-        else if (title.includes('battery') || title.includes('betri') || 
-                 title.includes('jack') || title.includes('spare')) {
-          matchedCategoryId = "13";
-        }
-      }
-      
-      // Add product to its category map - use the original product reference
-      if (matchedCategoryId && map[matchedCategoryId]) {
-        map[matchedCategoryId].push(product);
-      } else {
-        // If no category found, put in "Bidhaa Zote"
-        if (map["14"]) {
-          map["14"].push(product);
-        }
-      }
-    });
-    
-    // Remove duplicates while preserving original references
-    Object.keys(map).forEach(catId => {
-      const seen = new Set();
-      map[catId] = map[catId].filter(p => {
-        const duplicate = seen.has(p.id);
-        seen.add(p.id);
-        return !duplicate;
-      });
-    });
-    
-    setCategoryProductMap(map);
-    console.log('✅ Category product map built');
-  }, [products, categories]);
-
-  // Build map when products and categories are loaded
-  useEffect(() => {
-    if (products.length > 0 && categories.length > 0) {
-      buildCategoryProductMap();
-    }
-  }, [products, categories, buildCategoryProductMap]);
-
-  // Search Logic
-  const filteredProducts = useMemo(() => {
-    if (!searchQuery.trim()) return [];
-    const q = searchQuery.toLowerCase();
-    return products.filter((p) => {
-      const categoryField = (p.category || (p as any).categoryName || '').toLowerCase();
-      return p.title?.toLowerCase().includes(q) || categoryField.includes(q);
-    });
-  }, [searchQuery, products]);
-
-  const filteredCategories = useMemo(() => {
-    const q = searchQuery.toLowerCase();
-    return categories.filter((c) => c.name.toLowerCase().includes(q));
-  }, [searchQuery, categories]);
-
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
-    setView('search-results');
-    navigate('/');
-  };
-
-  // Use pre-built category map for accurate filtering
-  const handleCategorySelect = (category: Category) => {
-    setIsSidebarOpen(false);
-    
-    // Handle "Bidhaa Zote" - show all products
-    if (category.id === '14' || category.name === 'Bidhaa Zote') {
-      setView('all-products');
-      navigate('/all-products');
-      window.scrollTo(0, 0);
-      return;
-    }
-    
-    // Get products directly from the pre-built map - these are original product references
-    const productsForCategory = categoryProductMap[category.id] || [];
-    
-    console.log(`📌 Category "${category.name}" has ${productsForCategory.length} products`);
-    
-    setCategoryProducts(productsForCategory);
-    setSelectedCategory(category);
-    setView('category-results');
-    navigate(`/category/${category.id}`);
-    window.scrollTo(0, 0);
-  };
-
-  // Helper functions for user management
-  const getOrCreateUserId = (): string => {
-    let userId = localStorage.getItem('sonko_user_id');
-    if (!userId) {
-      userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      localStorage.setItem('sonko_user_id', userId);
-    }
-    return userId;
-  };
-
-  // Generate anonymous user for logged-out users
-  const generateAnonymousUser = () => {
-    const userId = getOrCreateUserId();
-    
-    const colors = [
-      { bg: 'bg-blue-100', text: 'text-blue-600' },
-      { bg: 'bg-green-100', text: 'text-green-600' },
-      { bg: 'bg-purple-100', text: 'text-purple-600' },
-      { bg: 'bg-orange-100', text: 'text-orange-600' },
-      { bg: 'bg-pink-100', text: 'text-pink-600' },
-      { bg: 'bg-teal-100', text: 'text-teal-600' },
-      { bg: 'bg-indigo-100', text: 'text-indigo-600' },
-      { bg: 'bg-yellow-100', text: 'text-yellow-600' },
-    ];
-    
-    const seed = userId.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-    const idx = seed % colors.length;
-
-    return {
-      id: userId,
-      name: 'Mteja',
-      initials: 'MT',
-      color: colors[idx].bg,
-      textColor: colors[idx].text,
-    };
-  };
-
-  // Comments API integration
-  const fetchCommentsForProduct = async (productId: string) => {
-    if (isLoadingComments[productId]) return;
-    
-    setIsLoadingComments(prev => ({ ...prev, [productId]: true }));
-    
-    try {
-      const comments = await CommentsService.fetchComments(productId);
-      setProductComments(prev => ({ ...prev, [productId]: comments }));
-      
-      setCommentCounts(prev => ({ ...prev, [productId]: comments.length }));
-    } catch (error) {
-      console.error('Failed to fetch comments:', error);
-    } finally {
-      setIsLoadingComments(prev => ({ ...prev, [productId]: false }));
     }
   };
 
-  const handleAddComment = async (productId: string, content: string) => {
-    try {
-      const isLoggedIn = !!user;
-
-      const displayName = isLoggedIn ? 'Baraka Sonko Electronics' : 'Mteja';
-      const initials = isLoggedIn ? 'BS' : 'MT';
-
-      const anon = generateAnonymousUser();
-      const userId = isLoggedIn ? String(user?.id || 'admin') : anon.id;
-
-      const newComment: Omit<Comment, 'id' | 'timestamp' | 'likes' | 'isLiked'> = {
-        productId,
-        content,
-        userId,
-        userName: displayName,
-        userInitials: initials,
-        userColor: isLoggedIn ? 'bg-orange-100' : anon.color,
-        textColor: isLoggedIn ? 'text-orange-700' : anon.textColor,
-      };
-
-      const savedComment = await CommentsService.addComment(newComment);
-
-      if (savedComment) {
-        setProductComments(prev => ({
-          ...prev,
-          [productId]: [savedComment, ...(prev[productId] || [])],
-        }));
-
-        setCommentCounts(prev => ({
-          ...prev,
-          [productId]: (prev[productId] || 0) + 1,
-        }));
-
-        return savedComment;
-      }
-    } catch (error) {
-      console.error('Failed to add comment:', error);
-    }
-    return null;
-  };
-
-  const handleLikeComment = async (commentId: string, productId: string) => {
-    try {
-      const userId = getOrCreateUserId();
-      const success = await CommentsService.likeComment(commentId, userId);
-      
-      if (success) {
-        setProductComments(prev => ({
-          ...prev,
-          [productId]: (prev[productId] || []).map(comment => {
-            if (comment.id === commentId) {
-              return {
-                ...comment,
-                likes: comment.likes + 1,
-                isLiked: true
-              };
-            }
-            return comment;
-          })
-        }));
-        return true;
-      }
-    } catch (error) {
-      console.error('Failed to like comment:', error);
-    }
-    return false;
-  };
-
-  const handleDeleteComment = async (commentId: string, productId: string) => {
-    try {
-      const success = await CommentsService.deleteComment(commentId);
-      
-      if (success) {
-        setProductComments(prev => ({
-          ...prev,
-          [productId]: (prev[productId] || []).filter(comment => comment.id !== commentId)
-        }));
-        
-        setCommentCounts(prev => ({
-          ...prev,
-          [productId]: Math.max(0, (prev[productId] || 0) - 1)
-        }));
-        
-        return true;
-      }
-    } catch (error) {
-      console.error('Failed to delete comment:', error);
-    }
-    return false;
-  };
-
-  const handleProductClick = (product: Product) => {
-    setSelectedProduct(product);
-    setView('product-detail');
-    
-    // Update URL to product-specific path
-    navigate(`/product/${product.id}`);
-
-    fetchCommentsForProduct(product.id);
-
-    (async () => {
-      const viewerKey = getOrCreateUserId();
-      const newCount = await ViewsService.recordView(product.id, viewerKey);
-      setViewCounts(prev => ({ ...prev, [product.id]: newCount }));
-    })();
-  };
-
-  const fetchSelectedProductComments = useCallback(() => {
-    if (!selectedProduct?.id) return;
-    fetchCommentsForProduct(selectedProduct.id);
-  }, [selectedProduct?.id]);
-
-  const addSelectedProductComment = useCallback((content: string) => {
-    if (!selectedProduct?.id) return Promise.resolve(null);
-    return handleAddComment(selectedProduct.id, content);
-  }, [selectedProduct?.id]);
-
-  const likeSelectedProductComment = useCallback((commentId: string) => {
-    if (!selectedProduct?.id) return Promise.resolve(false);
-    return handleLikeComment(commentId, selectedProduct.id);
-  }, [selectedProduct?.id]);
-
-  const deleteSelectedProductComment = useCallback((commentId: string) => {
-    if (!selectedProduct?.id) return Promise.resolve(false);
-    return handleDeleteComment(commentId, selectedProduct.id);
-  }, [selectedProduct?.id]);
-
-  const recordSelectedProductView = useCallback(async () => {
-    if (!selectedProduct?.id) return;
-    const pid = selectedProduct.id;
-    if (isRecordingView[pid]) return;
-
-    setIsRecordingView(prev => ({ ...prev, [pid]: true }));
-    try {
-      const viewerKey = getOrCreateUserId();
-      const newCount = await ViewsService.recordView(pid, viewerKey);
-      setViewCounts(prev => ({ ...prev, [pid]: newCount }));
-    } finally {
-      setIsRecordingView(prev => ({ ...prev, [pid]: false }));
-    }
-  }, [selectedProduct?.id, isRecordingView]);
-
-  // Admin session
-  const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('sonko_user');
-    return saved ? JSON.parse(saved) : null;
-  });
-
-  const [showAuth, setShowAuth] = useState(false);
-
-  const addProduct = async (newProduct: Product) => {
-    try {
-      const response = await fetch('/api/products', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newProduct),
-      });
-
-      const result = await response.json().catch(() => null);
-      if (!response.ok || !result?.success) return false;
-
-      const savedRaw = result.data || result.product || result.item;
-
-      if (savedRaw) {
-        const saved = normalizeProduct(savedRaw, categories);
-
-        setProducts((prev) => {
-          const updated = [saved, ...prev];
-          saveToCache(PRODUCTS_CACHE_KEY, updated);
-          return updated;
-        });
-
-        setCommentCounts(prev => ({
-          ...prev,
-          [saved.id]: 0
-        }));
-
-        setViewCounts(prev => ({
-          ...prev,
-          [saved.id]: 0
-        }));
-
-        return true;
-      }
-
-      const prodRes = await fetch('/api/products?app=sound');
-      const prodData = await prodRes.json().catch(() => null);
-
-      if (prodData?.success) {
-        const normalized = (prodData.data || []).map((p: any) => normalizeProduct(p, categories));
-        setProducts(normalized);
-        saveToCache(PRODUCTS_CACHE_KEY, normalized);
-      }
-
-      return true;
-    } catch (e) {
-      console.error(e);
-      return false;
-    }
-  };
-
-  const deleteProduct = async (id: string) => {
-    try {
-      const response = await fetch(`/api/products?id=${encodeURIComponent(String(id))}`, {
-        method: 'DELETE',
-      });
-
-      const result = await response.json().catch(() => null);
-
-      if (result?.success) {
-        setProducts((prev) => {
-          const updated = prev.filter((p) => String(p.id) !== String(id));
-          saveToCache(PRODUCTS_CACHE_KEY, updated);
-          return updated;
-        });
-
-        setProductComments(prev => {
-          const newComments = { ...prev };
-          delete newComments[id];
-          return newComments;
-        });
-
-        setCommentCounts(prev => {
-          const newCounts = { ...prev };
-          delete newCounts[id];
-          return newCounts;
-        });
-
-        setViewCounts(prev => {
-          const newCounts = { ...prev };
-          delete newCounts[id];
-          return newCounts;
-        });
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleAdminAccess = () => {
-    if (!user) setShowAuth(true);
-    else {
-      setView('admin');
-      navigate('/admin');
-    }
-  };
-
-  const handleLogin = (newUser: User) => {
-    setUser(newUser);
-    localStorage.setItem('sonko_user', JSON.stringify(newUser));
-    setShowAuth(false);
-    setView('admin');
-    navigate('/admin');
-  };
-
-  const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem('sonko_user');
-    setView('home');
-    navigate('/');
-  };
-
-  const handleBackToHome = () => {
-    setView('home');
-    navigate('/');
-  };
-
-  const handleRefreshCachedData = async () => {
-    clearStoreCache();
-    window.location.reload();
-  };
-
-  const handleBarakasonkoClick = () => {
-    setView('barakasonko');
-    navigate('/barakasonko');
-  };
-
-  const navView =
-    view === 'admin'
-      ? 'admin'
-      : view === 'categories'
-      ? 'categories'
-      : view === 'all-products'
-      ? 'all-products'
-      : view === 'search-results'
-      ? 'search-results'
-      : view === 'category-results'
-      ? 'categories'
-      : view === 'barakasonko'
-      ? 'home'
-      : 'home';
-
-  // Updated loader with speaker design and SONKO SOUND branding
-  if (isLoading && view !== 'category-results' && view !== 'barakasonko') {
+  if (!products || products.length === 0) {
     return (
-      <div className="fixed inset-0 bg-gradient-to-br from-[#f7f7f7] via-white to-[#f3f3f3] flex items-center justify-center px-6 z-[999]">
-        <div className="relative flex flex-col items-center">
-          {/* Glow */}
-          <div className="absolute w-40 h-40 rounded-full bg-[#f26b2e]/10 blur-3xl animate-pulse" />
-
-          {/* Logo + Brand */}
-          <div className="relative flex flex-col items-center">
-            <div className="relative w-24 h-24 flex items-center justify-center">
-              {/* Outer ring */}
-              <div className="absolute inset-0 rounded-full border-[6px] border-[#f26b2e] opacity-95 animate-[spin_6s_linear_infinite]" />
-
-              {/* Inner speaker body */}
-              <div className="relative w-16 h-16 rounded-full bg-white shadow-[0_8px_30px_rgba(242,107,46,0.18)] border border-[#ececec] flex items-center justify-center">
-                <svg
-                  viewBox="0 0 64 64"
-                  className="w-9 h-9"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  {/* Speaker box */}
-                  <rect x="16" y="22" width="14" height="20" rx="3" fill="#f26b2e" />
-                  <path d="M30 27L40 20V44L30 37V27Z" fill="#f26b2e" />
-
-                  {/* Sound waves */}
-                  <path
-                    d="M44 25C47 27.5 49 31 49 32C49 33 47 36.5 44 39"
-                    stroke="#f26b2e"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M48 20C52 24 55 29 55 32C55 35 52 40 48 44"
-                    stroke="#cfcfcf"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
-
-              {/* Animated sound bars */}
-              <div className="absolute -right-10 flex items-end gap-1 h-10">
-                <span className="w-1.5 rounded-full bg-[#f26b2e] animate-[soundBar_0.9s_ease-in-out_infinite]" />
-                <span className="w-1.5 rounded-full bg-[#f59a6a] animate-[soundBar_0.9s_ease-in-out_infinite_0.15s]" />
-                <span className="w-1.5 rounded-full bg-[#d9d9d9] animate-[soundBar_0.9s_ease-in-out_infinite_0.3s]" />
-              </div>
-            </div>
-
-            {/* Brand text */}
-            <div className="mt-6 text-center">
-              <h1 className="text-[34px] leading-none font-black tracking-[0.18em] text-[#f26b2e] drop-shadow-sm">
-                SONKO
-              </h1>
-              <p className="mt-2 text-[13px] font-extrabold tracking-[0.45em] text-[#cfcfcf]">
-                SOUND
-              </p>
-              <div className="mt-4 flex items-center justify-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-[#f26b2e] animate-bounce" />
-                <span className="w-2 h-2 rounded-full bg-[#f59a6a] animate-bounce [animation-delay:120ms]" />
-                <span className="w-2 h-2 rounded-full bg-[#d7d7d7] animate-bounce [animation-delay:240ms]" />
-              </div>
-              <p className="mt-4 text-xs font-semibold tracking-[0.18em] uppercase text-[#9c9c9c]">
-                Loading store data...
-              </p>
-            </div>
-          </div>
-        </div>
+      <div className="py-8 px-4 text-center">
+        <p className="text-gray-500">No products available</p>
       </div>
     );
   }
 
-  if (fetchError) {
-    return (
-      <div className="fixed inset-0 bg-white flex flex-col items-center justify-center space-y-4 p-8">
-        <div className="text-3xl font-black italic text-orange-600">SONKO</div>
-        <div className="bg-red-50 border border-red-200 rounded-2xl p-6 max-w-md">
-          <div className="flex items-center space-x-3 mb-4">
-            <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-              <span className="text-red-600 text-xl">⚠️</span>
+  return (
+    <div className="relative py-8 overflow-hidden">
+      {/* Alibaba-style background sheds */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-24 -right-24 w-96 h-96 bg-gradient-to-br from-orange-200/30 to-amber-200/20 rounded-full blur-3xl" />
+        <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-gradient-to-tr from-amber-200/30 to-yellow-200/20 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-gradient-to-r from-orange-100/20 via-amber-100/20 to-orange-100/20 rounded-full blur-3xl" />
+      </div>
+
+      <div className="relative z-10 max-w-[600px] mx-auto px-4">
+        {/* Header with Alibaba style */}
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
+              <div className="w-1.5 h-7 bg-gradient-to-b from-orange-400 to-orange-500 rounded-full" />
+              <div className="w-1.5 h-5 bg-gradient-to-b from-amber-400 to-amber-500 rounded-full ml-0.5" />
             </div>
             <div>
-              <h3 className="font-black text-red-700">Connection Error</h3>
-              <p className="text-xs text-red-600">Failed to load store data</p>
+              <h2 className="text-lg font-black text-gray-900 tracking-tight">{title}</h2>
+              <p className="text-[10px] text-gray-500 mt-0.5">Premium selection for you</p>
             </div>
           </div>
-          <p className="text-sm text-gray-700 mb-4">{fetchError}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="w-full bg-orange-600 text-white font-black py-3 rounded-xl hover:bg-orange-700 transition-colors"
+          
+          {/* Navigation Arrows */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => scroll('left')}
+              className="w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm border border-orange-100/50 flex items-center justify-center text-orange-500 hover:bg-orange-50 transition-all shadow-lg hover:shadow-xl"
+              aria-label="Scroll left"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <button
+              onClick={() => scroll('right')}
+              className="w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm border border-orange-100/50 flex items-center justify-center text-orange-500 hover:bg-orange-50 transition-all shadow-lg hover:shadow-xl"
+              aria-label="Scroll right"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Horizontal Scrollable Grid */}
+        <div 
+          ref={scrollContainerRef}
+          className="flex overflow-x-auto no-scrollbar gap-4 pb-4"
+          style={{ scrollBehavior: 'smooth' }}
+        >
+          {products.slice(0, 15).map((product, index) => {
+            // Safely get image URL
+            const imageUrl = product.image || 
+                           (product.images && product.images.length > 0 ? product.images[0] : '') || 
+                           'https://via.placeholder.com/300?text=Product';
+            
+            // Safely get price
+            const price = product.price || product.sellingPrice || 0;
+            const originalPrice = product.original_price || (product.discount ? price * (100/(100-product.discount)) : null);
+            
+            return (
+              <div
+                key={product.id || index}
+                onClick={() => onProductClick(product)}
+                className="flex-shrink-0 w-[140px] group cursor-pointer"
+              >
+                <div className="relative bg-white/90 backdrop-blur-sm rounded-2xl overflow-hidden border border-orange-100/50 shadow-lg hover:shadow-xl transition-all duration-300 group-hover:scale-[1.02] group-active:scale-[0.98]">
+                  {/* Background shed for each card */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-orange-50/0 to-amber-50/0 group-hover:from-orange-50/60 group-hover:to-amber-50/60 transition-all duration-500" />
+                  
+                  {/* Top rank indicator */}
+                  {index < 3 && (
+                    <div className="absolute top-2 left-2 z-20">
+                      <div className="relative">
+                        <div className="w-5 h-5 bg-gradient-to-br from-orange-400 to-amber-500 rounded-full flex items-center justify-center shadow-lg">
+                          <span className="text-[9px] text-white font-black">#{index + 1}</span>
+                        </div>
+                        <div className="absolute inset-0 bg-orange-400 rounded-full blur-sm animate-pulse" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Discount badge */}
+                  {product.discount && product.discount > 0 && (
+                    <div className="absolute top-2 right-2 z-20">
+                      <div className="px-2 py-1 bg-gradient-to-r from-red-500 to-red-600 rounded-full shadow-lg">
+                        <span className="text-[8px] text-white font-black">-{product.discount}%</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Product Image */}
+                  <div className="relative w-full h-[140px] bg-gradient-to-br from-gray-50 to-gray-100">
+                    <WatermarkedImage
+                      src={imageUrl}
+                      alt={product.title || product.name || 'Product'}
+                      containerClass="w-full h-full"
+                      productId={product.id}
+                    />
+                    
+                    {/* Quick view overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  </div>
+
+                  {/* Product Info */}
+                  <div className="p-3 relative z-10">
+                    <h3 className="text-xs font-bold text-gray-800 line-clamp-2 mb-2 min-h-[32px] group-hover:text-orange-600 transition-colors">
+                      {product.title || product.name || 'Product Name'}
+                    </h3>
+                    
+                    <div className="flex items-baseline justify-between">
+                      <div>
+                        <span className="text-sm font-black text-orange-600">
+                          TSh {price.toLocaleString()}
+                        </span>
+                        {originalPrice && (
+                          <span className="text-[9px] text-gray-400 line-through ml-1">
+                            TSh {originalPrice.toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                      
+                      {/* Add to cart icon */}
+                      <div className="w-7 h-7 rounded-full bg-orange-100 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <svg className="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Hover shine effect */}
+                  <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-1000" />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Scroll indicators */}
+        <div className="flex items-center justify-center gap-1 mt-2">
+          <div className="w-12 h-1 bg-orange-200 rounded-full overflow-hidden">
+            <div className="w-1/3 h-full bg-gradient-to-r from-orange-400 to-amber-500 rounded-full animate-pulse" />
+          </div>
+          <div className="w-1 h-1 bg-orange-200 rounded-full" />
+          <div className="w-1 h-1 bg-orange-200 rounded-full" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * ==========================================================
+ * ✅ Product Grid Component (Simplified)
+ * ==========================================================
+ */
+const SimpleProductGrid: React.FC<{
+  products: Product[];
+  onProductClick: (product: Product) => void;
+  WatermarkedImage: React.FC<any>;
+}> = ({ products, onProductClick, WatermarkedImage }) => {
+  if (!products || products.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-gray-500">No products found</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      {products.map((product) => {
+        const imageUrl = product.image || 
+                        (product.images && product.images.length > 0 ? product.images[0] : '') || 
+                        'https://via.placeholder.com/300?text=Product';
+        const price = product.price || product.sellingPrice || 0;
+        
+        return (
+          <div
+            key={product.id}
+            onClick={() => onProductClick(product)}
+            className="bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm active:scale-[0.99] transition-transform cursor-pointer"
           >
-            Retry Loading
-          </button>
-          <p className="text-xs text-gray-500 mt-4 text-center">
-            Check your internet connection and try again
-          </p>
+            <div className="relative aspect-square bg-gray-100">
+              <WatermarkedImage
+                src={imageUrl}
+                alt={product.title || product.name || 'Product'}
+                containerClass="w-full h-full"
+                productId={product.id}
+              />
+              {product.discount && product.discount > 0 && (
+                <div className="absolute top-2 right-2 px-2 py-1 bg-red-500 rounded-full">
+                  <span className="text-[10px] text-white font-bold">-{product.discount}%</span>
+                </div>
+              )}
+            </div>
+            <div className="p-3">
+              <h3 className="text-xs font-bold text-gray-800 line-clamp-2 mb-2">
+                {product.title || product.name || 'Product Name'}
+              </h3>
+              <p className="text-sm font-black text-orange-600">
+                TSh {price.toLocaleString()}
+              </p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+/**
+ * ==========================================================
+ * ✅ Main Barakasonko Component
+ * ==========================================================
+ */
+const Barakasonko: React.FC<BarakasonkoProps> = ({
+  products,
+  onProductClick,
+  WatermarkedImage = DefaultWatermarkedImage
+}) => {
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'newest' | 'price-low' | 'price-high' | 'popular'>('newest');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Ensure products is an array
+  const safeProducts = useMemo(() => {
+    return Array.isArray(products) ? products : [];
+  }, [products]);
+
+  // Get unique categories for filter
+  const categories = useMemo(() => {
+    const cats = new Set<string>();
+    safeProducts.forEach(p => {
+      if (p.category_name) cats.add(p.category_name);
+      else if (p.category) cats.add(p.category);
+    });
+    return Array.from(cats).slice(0, 8);
+  }, [safeProducts]);
+
+  // Filter and sort products
+  const filteredProducts = useMemo(() => {
+    let filtered = [...safeProducts];
+
+    // Apply category filter
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(p => 
+        p.category_name === selectedCategory || p.category === selectedCategory
+      );
+    }
+
+    // Apply search filter
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(p => 
+        (p.title || p.name || '').toLowerCase().includes(term) ||
+        (p.description || '').toLowerCase().includes(term)
+      );
+    }
+
+    // Apply sorting
+    switch (sortBy) {
+      case 'newest':
+        // Sort by ID (assuming newer products have higher IDs)
+        filtered.sort((a, b) => String(b.id || '').localeCompare(String(a.id || '')));
+        break;
+      case 'price-low':
+        filtered.sort((a, b) => (a.price || 0) - (b.price || 0));
+        break;
+      case 'price-high':
+        filtered.sort((a, b) => (b.price || 0) - (a.price || 0));
+        break;
+      case 'popular':
+        // Randomize for demo
+        filtered.sort(() => Math.random() - 0.5);
+        break;
+    }
+
+    return filtered;
+  }, [safeProducts, selectedCategory, sortBy, searchTerm]);
+
+  // Get products for horizontal scroll section
+  const scrollProducts = useMemo(() => {
+    return filteredProducts.slice(0, 15);
+  }, [filteredProducts]);
+
+  // Loading state
+  if (!safeProducts.length) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-white via-orange-50/10 to-amber-50/10 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading products...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="relative min-h-screen bg-white">
-      {/* Product Detail View */}
-      {view === 'product-detail' && selectedProduct && (
-        <ProductDetailView
-          product={selectedProduct}
-          allProducts={products}
-          onBack={handleBackToHome}
-          onProductClick={handleProductClick}
-          WatermarkedImage={WatermarkedImage}
-          VideoPlayer={VideoPlayer}
-          Banner={Banner}
-          comments={productComments[selectedProduct.id] || []}
-          commentCount={commentCounts[selectedProduct.id] || 0}
-          onFetchComments={fetchSelectedProductComments}
-          onAddComment={addSelectedProductComment}
-          onLikeComment={likeSelectedProductComment}
-          onDeleteComment={deleteSelectedProductComment}
-          isLoadingComments={isLoadingComments[selectedProduct.id] || false}
-          viewCount={viewCounts[selectedProduct.id] || 0}
-          onRecordView={recordSelectedProductView}
-        />
-      )}
+    <div className="min-h-screen bg-gradient-to-br from-white via-orange-50/10 to-amber-50/10">
+      {/* Background sheds for entire page */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-48 -right-48 w-[600px] h-[600px] bg-gradient-to-br from-orange-200/20 to-amber-200/20 rounded-full blur-3xl" />
+        <div className="absolute -bottom-48 -left-48 w-[600px] h-[600px] bg-gradient-to-tr from-amber-200/20 to-yellow-200/20 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-to-r from-orange-100/10 via-amber-100/10 to-orange-100/10 rounded-full blur-3xl" />
+      </div>
 
-      {/* Auth View */}
-      {showAuth && <AuthView onLogin={handleLogin} onBack={() => setShowAuth(false)} />}
+      {/* Content */}
+      <div className="relative z-10 max-w-[600px] mx-auto">
+        {/* Header Section */}
+        <div className="relative bg-gradient-to-br from-orange-500 to-amber-600 px-6 py-8 overflow-hidden">
+          {/* Background sheds for header */}
+          <div className="absolute inset-0">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-amber-400/20 rounded-full blur-3xl" />
+          </div>
 
-      {/* Sidebar */}
-      <Sidebar
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-        onCategorySelect={handleCategorySelect}
-      />
-
-      {/* Header */}
-      {view !== 'product-detail' && (
-        <Header
-          onMenuClick={() => setIsSidebarOpen(true)}
-          onSearch={handleSearch}
-          initialValue={searchQuery}
-          onProductSelect={handleProductClick}
-          onBarakasonkoClick={handleBarakasonkoClick}
-        />
-      )}
-
-      <main className="w-full max-w-[600px] mx-auto pb-24">
-        {view === 'barakasonko' ? (
-          <Barakasonko
-            products={products}
-            onProductClick={handleProductClick}
-            WatermarkedImage={WatermarkedImage}
-          />
-        ) : view === 'home' ? (
-          <>
-            <QuickActions onActionSelect={() => {
-              setView('all-products');
-              navigate('/all-products');
-            }} />
-
-            <CategorySection
-              categories={categories}
-              onCategorySelect={handleCategorySelect}
-              onMore={() => {
-                setView('categories');
-                navigate('/categories');
-              }}
-            />
-
-            {/* Flash Sale - RESTORED */}
-            <FlashSale
-              products={products}
-              onProductClick={handleProductClick}
-              onSeeAll={() => {
-                setView('all-products');
-                navigate('/all-products');
-              }}
-              WatermarkedImage={WatermarkedImage}
-            />
-
-            <ProductGrid
-              title="Daily Discoveries"
-              products={products}
-              onProductClick={handleProductClick}
-              WatermarkedImage={WatermarkedImage}
-            />
-          </>
-        ) : view === 'all-products' ? (
-          <AllProductsView
-            products={products}
-            onProductClick={handleProductClick}
-            onLoadMore={() => {}}
-            isLoading={false}
-            WatermarkedImage={WatermarkedImage}
-          />
-        ) : view === 'category-results' && selectedCategory ? (
-          <div className="animate-fadeIn p-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-3">
-                {selectedCategory.icon && (
-                  <span className="text-2xl">{selectedCategory.icon}</span>
-                )}
-                <div>
-                  <h2 className="text-sm font-bold text-gray-500 uppercase">
-                    {selectedCategory.name}
-                  </h2>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {categoryProducts.length} products
-                  </p>
-                </div>
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                <span className="text-2xl">🏪</span>
               </div>
-              <button
-                className="text-xs font-black text-orange-600"
-                onClick={() => {
-                  setView('all-products');
-                  navigate('/all-products');
-                }}
-              >
-                View All Products
-              </button>
+              <div>
+                <h1 className="text-2xl font-black text-white">Baraka Sonko</h1>
+                <p className="text-sm text-orange-100">Your Trusted Electronics Store</p>
+              </div>
             </div>
 
-            <ProductGrid
-              products={categoryProducts}
-              onProductClick={handleProductClick}
-              WatermarkedImage={WatermarkedImage}
-              emptyMessage={`No products found in ${selectedCategory.name} category`}
-            />
-          </div>
-        ) : view === 'search-results' ? (
-          <div className="animate-fadeIn p-4">
-            <h2 className="text-sm font-bold text-gray-500 uppercase mb-4">
-              {searchQuery ? `Results for "${searchQuery}"` : 'Search'}
-            </h2>
+            <p className="text-white/90 text-sm max-w-md leading-relaxed">
+              Discover amazing deals on electronics, audio equipment, and accessories. 
+              Quality products at the best prices in town.
+            </p>
 
-            {filteredCategories.length > 0 && (
-              <div className="mb-6">
-                <p className="text-[11px] font-black text-gray-400 uppercase mb-2">Matching Categories</p>
+            {/* Stats */}
+            <div className="flex items-center gap-4 mt-5">
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-2">
+                <p className="text-2xl font-black text-white">{safeProducts.length}</p>
+                <p className="text-[10px] text-orange-100">Products</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-2">
+                <p className="text-2xl font-black text-white">{categories.length}</p>
+                <p className="text-[10px] text-orange-100">Categories</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-2">
+                <p className="text-2xl font-black text-white">24/7</p>
+                <p className="text-[10px] text-orange-100">Support</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Search Bar */}
+        <div className="px-4 -mt-5 mb-5">
+          <div className="relative">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search in Baraka Sonko..."
+              className="w-full px-5 py-4 pr-12 bg-white/90 backdrop-blur-sm border border-orange-100/50 rounded-2xl shadow-lg focus:outline-none focus:ring-2 focus:ring-orange-300 text-sm"
+            />
+            <svg
+              className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-orange-500"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-12 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Horizontal Scroll Section - 5+ products grid */}
+        {scrollProducts.length > 0 && (
+          <HorizontalScrollSection
+            title="Featured Products"
+            products={scrollProducts}
+            onProductClick={onProductClick}
+            WatermarkedImage={WatermarkedImage}
+          />
+        )}
+
+        {/* Filters and Sort */}
+        <div className="px-4 py-4">
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-orange-100/50 shadow-lg">
+            {/* Category Filter */}
+            {categories.length > 0 && (
+              <div className="mb-4">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Categories</p>
                 <div className="flex flex-wrap gap-2">
-                  {filteredCategories.slice(0, 8).map((c) => (
+                  <button
+                    onClick={() => setSelectedCategory('all')}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                      selectedCategory === 'all'
+                        ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg'
+                        : 'bg-gray-100 text-gray-600 hover:bg-orange-50'
+                    }`}
+                  >
+                    All Products
+                  </button>
+                  {categories.slice(0, 5).map(cat => (
                     <button
-                      key={c.id}
-                      className="px-3 py-2 rounded-full bg-gray-100 text-xs font-black text-gray-700 flex items-center space-x-2 hover:bg-orange-100 hover:text-orange-700 transition-colors"
-                      onClick={() => handleCategorySelect(c)}
+                      key={cat}
+                      onClick={() => setSelectedCategory(cat)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                        selectedCategory === cat
+                          ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg'
+                          : 'bg-gray-100 text-gray-600 hover:bg-orange-50'
+                      }`}
                     >
-                      {c.icon && <span>{c.icon}</span>}
-                      <span>{c.name}</span>
+                      {cat}
                     </button>
                   ))}
                 </div>
               </div>
             )}
 
-            <ProductGrid 
-              products={filteredProducts} 
-              onProductClick={handleProductClick}
-              WatermarkedImage={WatermarkedImage}
-            />
+            {/* Sort Options */}
+            <div>
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Sort By</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSortBy('newest')}
+                  className={`flex-1 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+                    sortBy === 'newest'
+                      ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg'
+                      : 'bg-gray-100 text-gray-600 hover:bg-orange-50'
+                  }`}
+                >
+                  Newest
+                </button>
+                <button
+                  onClick={() => setSortBy('price-low')}
+                  className={`flex-1 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+                    sortBy === 'price-low'
+                      ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg'
+                      : 'bg-gray-100 text-gray-600 hover:bg-orange-50'
+                  }`}
+                >
+                  Price: Low
+                </button>
+                <button
+                  onClick={() => setSortBy('price-high')}
+                  className={`flex-1 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+                    sortBy === 'price-high'
+                      ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg'
+                      : 'bg-gray-100 text-gray-600 hover:bg-orange-50'
+                  }`}
+                >
+                  Price: High
+                </button>
+              </div>
+            </div>
           </div>
-        ) : view === 'categories' ? (
-          <CategoriesView
-            onCategorySelect={handleCategorySelect}
-            onShowAllProducts={() => {
-              setView('all-products');
-              navigate('/all-products');
-            }}
-            suggestedProducts={products}
-            onProductClick={handleProductClick}
+        </div>
+
+        {/* Product Grid */}
+        <div className="px-4 pb-8">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-black text-gray-900">All Products</h3>
+            <p className="text-xs text-gray-500">{filteredProducts.length} items</p>
+          </div>
+          <SimpleProductGrid
+            products={filteredProducts}
+            onProductClick={onProductClick}
+            WatermarkedImage={WatermarkedImage}
           />
-        ) : view === 'admin' ? (
-          <ErrorBoundary title="Admin screen crashed">
-            <AdminView
-              products={products}
-              categories={categories}
-              onAddProduct={addProduct}
-              onDeleteProduct={deleteProduct}
-              WatermarkedImage={WatermarkedImage}
-              VideoPlayer={VideoPlayer}
-              Banner={Banner}
-            />
-          </ErrorBoundary>
-        ) : null}
-      </main>
-
-      {/* Bottom Nav */}
-      {view !== 'product-detail' && (
-        <BottomNav
-          currentView={navView as any}
-          onViewChange={(v: any) => {
-            if (v === 'admin') handleAdminAccess();
-            else if (v === 'home') {
-              setView('home');
-              navigate('/');
-            } else if (v === 'categories') {
-              setView('categories');
-              navigate('/categories');
-            } else if (v === 'all-products') {
-              setView('all-products');
-              navigate('/all-products');
-            }
-          }}
-        />
-      )}
-
-      {/* Copyright Footer - Updated to Sonko Sound */}
-      <div className="fixed bottom-0 left-0 right-0 bg-black text-white text-center py-2 text-xs z-40">
-        ©SonkoSound - Product images protected
+        </div>
       </div>
     </div>
   );
 };
 
-// Main App component with Router
-const App: React.FC = () => {
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<AppContent />} />
-        <Route path="/product/:productId" element={<AppContent />} />
-        <Route path="/category/:categoryId" element={<AppContent />} />
-        <Route path="/categories" element={<AppContent />} />
-        <Route path="/all-products" element={<AppContent />} />
-        <Route path="/admin" element={<AppContent />} />
-        <Route path="/barakasonko" element={<AppContent />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
-  );
-};
-
-export default App;
+export default Barakasonko;
