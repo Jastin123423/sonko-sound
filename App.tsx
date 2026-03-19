@@ -13,6 +13,7 @@ import AuthView from './components/AuthView';
 import ProductDetailView from './components/ProductDetailView';
 import CategoriesView from './components/CategoriesView';
 import AllProductsView from './components/AllProductsView';
+import Barakasonko from './components/Barakasonko';
 import { Product, User, Category, Comment } from './types';
 
 // Cache helpers
@@ -661,6 +662,7 @@ const AppContent: React.FC = () => {
     | 'categories'
     | 'search-results'
     | 'all-products'
+    | 'barakasonko'
   >('home');
 
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -1416,6 +1418,11 @@ const AppContent: React.FC = () => {
     window.location.reload();
   };
 
+  const handleBarakasonkoClick = () => {
+    setView('barakasonko');
+    navigate('/barakasonko');
+  };
+
   const navView =
     view === 'admin'
       ? 'admin'
@@ -1427,10 +1434,12 @@ const AppContent: React.FC = () => {
       ? 'search-results'
       : view === 'category-results'
       ? 'categories'
+      : view === 'barakasonko'
+      ? 'home'
       : 'home';
 
   // Updated loader with speaker design and SONKO SOUND branding
-  if (isLoading && view !== 'category-results') {
+  if (isLoading && view !== 'category-results' && view !== 'barakasonko') {
     return (
       <div className="fixed inset-0 bg-gradient-to-br from-[#f7f7f7] via-white to-[#f3f3f3] flex items-center justify-center px-6 z-[999]">
         <div className="relative flex flex-col items-center">
@@ -1574,11 +1583,18 @@ const AppContent: React.FC = () => {
           onSearch={handleSearch}
           initialValue={searchQuery}
           onProductSelect={handleProductClick}
+          onBarakasonkoClick={handleBarakasonkoClick}
         />
       )}
 
       <main className="w-full max-w-[600px] mx-auto pb-24">
-        {view === 'home' ? (
+        {view === 'barakasonko' ? (
+          <Barakasonko
+            products={products}
+            onProductClick={handleProductClick}
+            WatermarkedImage={WatermarkedImage}
+          />
+        ) : view === 'home' ? (
           <>
             <QuickActions onActionSelect={() => {
               setView('all-products');
@@ -1748,6 +1764,7 @@ const App: React.FC = () => {
         <Route path="/categories" element={<AppContent />} />
         <Route path="/all-products" element={<AppContent />} />
         <Route path="/admin" element={<AppContent />} />
+        <Route path="/barakasonko" element={<AppContent />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
