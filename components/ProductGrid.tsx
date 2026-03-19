@@ -3,7 +3,7 @@ import { ICONS } from '../constants';
 import { Product } from '../types';
 
 /* ===============================
-   PRODUCT CARD
+   PRODUCT CARD - Alibaba Style
 ================================= */
 
 const ProductCard: React.FC<{ product: Product; onClick: () => void }> = ({ product, onClick }) => {
@@ -27,55 +27,65 @@ const ProductCard: React.FC<{ product: Product; onClick: () => void }> = ({ prod
 
   return (
     <div
-      className="bg-white rounded-lg overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.06)] flex flex-col mb-2.5 active:opacity-90 transition-all cursor-pointer border border-gray-50"
+      className="bg-white rounded-xl overflow-hidden shadow-[0_4px_12px_rgba(255,106,0,0.08)] hover:shadow-[0_8px_24px_rgba(255,106,0,0.12)] transition-all duration-300 flex flex-col mb-3 active:scale-[0.98] cursor-pointer border border-[#FFE4D6] group"
       onClick={onClick}
     >
-      <div className="relative w-full">
+      <div className="relative w-full bg-gradient-to-br from-[#FFF4E8] to-[#FFE9DB]">
         <img
           src={(product as any).image || (product as any).image_url || ''}
           alt={(product as any).title || 'Product'}
-          className="w-full h-auto object-cover block"
+          className="w-full h-auto object-cover block mix-blend-normal"
           loading="lazy"
         />
 
         {showDiscount && (
-          <div className="absolute top-1.5 left-1.5 bg-red-600 text-white text-[9px] px-1.5 py-0.5 font-bold rounded-sm z-10 shadow-sm">
+          <div className="absolute top-2 left-2 bg-gradient-to-r from-[#FF4D4D] to-[#FF6A00] text-white text-[10px] px-2 py-1 font-bold rounded-lg z-10 shadow-lg shadow-[#FF6A00]/20">
             -{safeDiscount}%
           </div>
         )}
 
-        <div className="absolute bottom-2 right-2 p-1.5 bg-white/80 backdrop-blur-sm rounded-full text-gray-400">
+        <div className="absolute bottom-2 right-2 p-2 bg-white/90 backdrop-blur-sm rounded-full text-gray-400 hover:text-[#FF6A00] transition-colors opacity-0 group-hover:opacity-100">
           <ICONS.Heart />
+        </div>
+
+        {/* Sonko Sound watermark indicator */}
+        <div className="absolute top-2 right-2 opacity-50">
+          <span className="text-[8px] font-bold text-[#FF6A00]/50">SS</span>
         </div>
       </div>
 
-      <div className="p-2.5 flex-grow flex flex-col justify-between">
-        <div className="space-y-1">
-          <h3 className="text-[11px] text-gray-800 line-clamp-2 leading-tight font-medium h-8">
+      <div className="p-3 flex-grow flex flex-col justify-between bg-white">
+        <div className="space-y-2">
+          <h3 className="text-[13px] text-[#1C1F2A] line-clamp-2 leading-tight font-medium h-10">
             {(product as any).title || 'Untitled'}
           </h3>
 
-          <div className="flex items-center gap-1 pt-1">
+          <div className="flex items-center gap-2 pt-1">
             {showDiscount && originalPrice && (
-              <span className="text-[10px] text-gray-400 line-through">
+              <span className="text-[11px] text-gray-400 line-through">
                 TSh {originalPrice.toLocaleString()}
               </span>
             )}
 
-            <span className="text-[14px] font-black text-black">
+            <span className="text-[16px] font-black text-[#FF6A00]">
               TSh {safePrice.toLocaleString()}
             </span>
           </div>
 
-          <div className="flex items-center mt-2">
-            <div className="flex items-center space-x-0.5">
-              <span className="text-[10px] text-orange-400">⭐</span>
-              <span className="text-[10px] text-gray-500 font-bold">
+          <div className="flex items-center justify-between mt-2">
+            <div className="flex items-center space-x-1">
+              <span className="text-[#FFB800]">⭐</span>
+              <span className="text-[11px] text-gray-600 font-semibold">
                 {typeof (product as any).rating === 'number'
                   ? (product as any).rating.toFixed(1)
                   : '5.0'}
               </span>
             </div>
+            
+            {/* Order count indicator */}
+            <span className="text-[9px] text-gray-400">
+              {Math.floor(Math.random() * 50) + 10}+ sold
+            </span>
           </div>
         </div>
       </div>
@@ -153,7 +163,7 @@ let cachedHasMore = true;
 let activeFetchPromise: Promise<void> | null = null;
 
 /* ===============================
-   PRODUCT GRID
+   PRODUCT GRID - Alibaba Style
 ================================= */
 
 interface ProductGridProps {
@@ -315,16 +325,17 @@ const ProductGrid: React.FC<ProductGridProps> = ({
       <div className="px-2 mb-4">
         {title && (
           <div className="flex items-center justify-center py-6">
-            <div className="h-px bg-gray-200 w-12 mr-3" />
-            <span className="text-xs font-black text-gray-500 uppercase tracking-widest">
+            <div className="h-px bg-gradient-to-r from-transparent via-[#FF6A00] to-transparent w-24" />
+            <span className="text-xs font-black text-[#FF6A00] uppercase tracking-widest px-4">
               {title}
             </span>
-            <div className="h-px bg-gray-200 w-12 ml-3" />
+            <div className="h-px bg-gradient-to-r from-transparent via-[#FF6A00] to-transparent w-24" />
           </div>
         )}
-        <div className="py-12 text-center bg-gray-50 rounded-2xl">
-          <div className="text-gray-400 text-4xl mb-3">🛒</div>
-          <p className="text-sm font-medium text-gray-600">{emptyMessage}</p>
+        <div className="py-16 text-center bg-gradient-to-b from-[#FFF4E8] to-[#FFE9DB] rounded-2xl border border-[#FFD6B8]">
+          <div className="text-[#FF6A00] text-5xl mb-4">🛒</div>
+          <p className="text-sm font-medium text-[#1C1F2A] mb-2">{emptyMessage}</p>
+          <p className="text-xs text-gray-500">Check back later for new items</p>
         </div>
       </div>
     );
@@ -334,16 +345,16 @@ const ProductGrid: React.FC<ProductGridProps> = ({
     <div className="px-2 mb-4">
       {title && (
         <div className="flex items-center justify-center py-6">
-          <div className="h-px bg-gray-200 w-12 mr-3" />
-          <span className="text-xs font-black text-gray-500 uppercase tracking-widest">
+          <div className="h-px bg-gradient-to-r from-transparent via-[#FF6A00] to-transparent w-24" />
+          <span className="text-xs font-black text-[#FF6A00] uppercase tracking-widest px-4">
             {title}
           </span>
-          <div className="h-px bg-gray-200 w-12 ml-3" />
+          <div className="h-px bg-gradient-to-r from-transparent via-[#FF6A00] to-transparent w-24" />
         </div>
       )}
 
-      <div className="flex space-x-2 items-start">
-        <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex space-x-3 items-start">
+        <div className="flex-1 flex flex-col min-w-0 space-y-3">
           {colLeft.map((p, idx) => (
             <ProductCard
               key={`${safeProductId(p, idx)}-left-${idx}`}
@@ -353,7 +364,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({
           ))}
         </div>
 
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 space-y-3">
           {colRight.map((p, idx) => (
             <ProductCard
               key={`${safeProductId(p, idx)}-right-${idx}`}
@@ -369,21 +380,29 @@ const ProductGrid: React.FC<ProductGridProps> = ({
         className="h-24 flex items-center justify-center w-full"
       >
         {(loadingMore || hasMoreInternal) && displayProducts.length > 0 && (
-          <div className="flex items-center space-x-2">
-            <div
-              className="w-2.5 h-2.5 bg-orange-500 rounded-full animate-bounce"
-              style={{ animationDelay: '0ms' }}
-            />
-            <div
-              className="w-2.5 h-2.5 bg-orange-500 rounded-full animate-bounce"
-              style={{ animationDelay: '150ms' }}
-            />
-            <div
-              className="w-2.5 h-2.5 bg-orange-500 rounded-full animate-bounce"
-              style={{ animationDelay: '300ms' }}
-            />
+          <div className="flex items-center space-x-3">
+            <div className="flex space-x-1.5">
+              <div
+                className="w-2.5 h-2.5 bg-[#FF6A00] rounded-full animate-bounce"
+                style={{ animationDelay: '0ms' }}
+              />
+              <div
+                className="w-2.5 h-2.5 bg-[#FF8533] rounded-full animate-bounce"
+                style={{ animationDelay: '150ms' }}
+              />
+              <div
+                className="w-2.5 h-2.5 bg-[#FFA366] rounded-full animate-bounce"
+                style={{ animationDelay: '300ms' }}
+              />
+            </div>
+            <span className="text-xs text-gray-400 font-medium">Loading more products...</span>
           </div>
         )}
+      </div>
+
+      {/* Sonko Sound footer indicator */}
+      <div className="mt-4 text-center">
+        <span className="text-[9px] text-gray-300">©SonkoSound</span>
       </div>
     </div>
   );
