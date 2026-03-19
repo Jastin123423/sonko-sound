@@ -1,6 +1,5 @@
-// Here App.tsx
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { BrowserRouter, Routes, Route, useNavigate, useParams, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useNavigate, useParams, Navigate, useLocation } from 'react-router-dom';
 import Header from './components/Header';
 import QuickActions from './components/QuickActions';
 import CategorySection from './components/CategorySection';
@@ -19,7 +18,7 @@ import { Product, User, Category, Comment } from './types';
 // Cache helpers
 const PRODUCTS_CACHE_KEY = 'sonko_sound_products_cache_v1';
 const CATEGORIES_CACHE_KEY = 'sonko_sound_categories_cache_v1';
-const CACHE_MAX_AGE = 1000 * 60 * 60 * 24 * 365; // 1 year
+const CACHE_MAX_AGE = 1000 * 60 * 60 * 24 * 365;
 
 type CachePayload<T> = {
   timestamp: number;
@@ -64,6 +63,16 @@ const clearStoreCache = () => {
   localStorage.removeItem(CATEGORIES_CACHE_KEY);
 };
 
+const getInitialViewFromPath = (pathname: string) => {
+  if (pathname.startsWith('/product/')) return 'product-detail';
+  if (pathname.startsWith('/category/')) return 'category-results';
+  if (pathname === '/categories') return 'categories';
+  if (pathname === '/all-products') return 'all-products';
+  if (pathname === '/admin') return 'admin';
+  if (pathname === '/barakasonko') return 'barakasonko';
+  return 'home';
+};
+
 /** Watermarked Image Component - For PRODUCT IMAGES only */
 const WatermarkedImage: React.FC<{
   src: string;
@@ -72,11 +81,11 @@ const WatermarkedImage: React.FC<{
   onClick?: () => void;
   productId?: string;
   isProduct?: boolean;
-}> = ({ 
-  src, 
-  alt = '', 
-  containerClass = '', 
-  onClick, 
+}> = ({
+  src,
+  alt = '',
+  containerClass = '',
+  onClick,
   productId = '',
   isProduct = true
 }) => {
@@ -84,22 +93,21 @@ const WatermarkedImage: React.FC<{
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
 
-  // Only apply watermarks to product images, not banners
   const shouldWatermark = isProduct;
 
-  // Generate unique watermark pattern for products
   const getWatermarkPattern = () => {
     if (!shouldWatermark) return { positions: [], opacities: [], sizes: [] };
-    
+
     const patterns = [
       { positions: ['bottom-right', 'top-left'], opacities: [0.6, 0.4], sizes: [40, 35] },
       { positions: ['bottom-left', 'top-right'], opacities: [0.5, 0.5], sizes: [38, 38] },
       { positions: ['center', 'bottom-right'], opacities: [0.4, 0.3], sizes: [45, 32] },
     ];
-    // Use a stable hash of productId to ensure consistent pattern
-    const patternIndex = productId ? 
-      Math.abs(productId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % patterns.length : 
-      0;
+
+    const patternIndex = productId
+      ? Math.abs(productId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % patterns.length
+      : 0;
+
     return patterns[patternIndex];
   };
 
@@ -107,44 +115,12 @@ const WatermarkedImage: React.FC<{
 
   const renderWatermark = (position: string, opacity: number, size: number) => {
     const positions: Record<string, React.CSSProperties> = {
-      'bottom-right': { 
-        bottom: '10px', 
-        right: '10px', 
-        width: `${size}px`, 
-        height: `${size}px`,
-      },
-      'top-left': { 
-        top: '10px', 
-        left: '10px', 
-        width: `${size}px`, 
-        height: `${size}px`,
-      },
-      'top-right': { 
-        top: '10px', 
-        right: '10px', 
-        width: `${size}px`, 
-        height: `${size}px`,
-      },
-      'bottom-left': { 
-        bottom: '10px', 
-        left: '10px', 
-        width: `${size}px`, 
-        height: `${size}px`,
-      },
-      'center': { 
-        top: '50%', 
-        left: '50%', 
-        transform: 'translate(-50%, -50%)',
-        width: `${size * 1.5}px`, 
-        height: `${size * 1.5}px`,
-      },
-      'right-middle': { 
-        top: '50%', 
-        right: '10px', 
-        transform: 'translateY(-50%)',
-        width: `${size}px`, 
-        height: `${size}px`,
-      },
+      'bottom-right': { bottom: '10px', right: '10px', width: `${size}px`, height: `${size}px` },
+      'top-left': { top: '10px', left: '10px', width: `${size}px`, height: `${size}px` },
+      'top-right': { top: '10px', right: '10px', width: `${size}px`, height: `${size}px` },
+      'bottom-left': { bottom: '10px', left: '10px', width: `${size}px`, height: `${size}px` },
+      'center': { top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: `${size * 1.5}px`, height: `${size * 1.5}px` },
+      'right-middle': { top: '50%', right: '10px', transform: 'translateY(-50%)', width: `${size}px`, height: `${size}px` },
     };
 
     if (!positions[position]) return null;
@@ -180,12 +156,9 @@ const WatermarkedImage: React.FC<{
         pointerEvents: onClick ? 'auto' : 'none',
       }}
       onContextMenu={(e) => {
-        if (shouldWatermark) {
-          e.preventDefault();
-        }
+        if (shouldWatermark) e.preventDefault();
       }}
     >
-      {/* Main image */}
       <img
         src={src}
         alt={alt}
@@ -196,21 +169,17 @@ const WatermarkedImage: React.FC<{
           pointerEvents: 'auto',
           opacity: isLoaded ? 1 : 0,
         }}
-        onLoad={() => {
-          setIsLoaded(true);
-        }}
+        onLoad={() => setIsLoaded(true)}
         onError={() => {
           console.error('❌ Failed to load image:', src);
           setHasError(true);
         }}
       />
-      
-      {/* Loading skeleton */}
+
       {!isLoaded && !hasError && (
         <div className="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse" style={{ zIndex: 1 }} />
       )}
-      
-      {/* Error state */}
+
       {hasError && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-100" style={{ zIndex: 2 }}>
           <div className="text-center p-4">
@@ -219,15 +188,13 @@ const WatermarkedImage: React.FC<{
           </div>
         </div>
       )}
-      
-      {/* Watermarks for PRODUCT images only - always render once loaded */}
+
       {shouldWatermark && !hasError && (
         <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 10 }}>
-          {pattern.positions.map((pos, idx) => 
+          {pattern.positions.map((pos, idx) =>
             renderWatermark(pos, pattern.opacities[idx], pattern.sizes[idx])
           )}
-          
-          {/* Copyright text for product images - updated to Sonko Sound */}
+
           <div
             className="absolute bottom-2 left-2 px-2 py-0.5 rounded"
             style={{
@@ -257,9 +224,9 @@ const VideoPlayer: React.FC<{
   muted?: boolean;
   loop?: boolean;
   controls?: boolean;
-}> = ({ 
-  src, 
-  containerClass = '', 
+}> = ({
+  src,
+  containerClass = '',
   onClick,
   playInline = true,
   autoPlay = false,
@@ -313,15 +280,13 @@ const VideoPlayer: React.FC<{
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
       />
-      
-      {/* Loading state */}
+
       {!isLoaded && !hasError && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-900/10">
           <div className="w-8 h-8 border-2 border-orange-600 border-t-transparent rounded-full animate-spin" />
         </div>
       )}
-      
-      {/* Error state */}
+
       {hasError && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-900/90">
           <div className="text-center text-white p-4">
@@ -330,8 +295,7 @@ const VideoPlayer: React.FC<{
           </div>
         </div>
       )}
-      
-      {/* Custom controls for autoplay videos */}
+
       {!controls && isLoaded && !hasError && (
         <button
           onClick={(e) => {
@@ -357,17 +321,16 @@ const Banner: React.FC<{
   containerClass?: string;
   onClick?: () => void;
   isGif?: boolean;
-}> = ({ 
-  src, 
-  alt = '', 
-  containerClass = '', 
+}> = ({
+  src,
+  alt = '',
+  containerClass = '',
   onClick,
   isGif = true
 }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
 
-  // Check if it's a GIF
   const isGifFile = src.toLowerCase().endsWith('.gif');
 
   return (
@@ -380,7 +343,6 @@ const Banner: React.FC<{
       }}
     >
       {isGifFile ? (
-        // GIF Banner - use img tag with decoding="async"
         <img
           src={src}
           alt={alt}
@@ -399,7 +361,6 @@ const Banner: React.FC<{
           }}
         />
       ) : (
-        // Regular image banner
         <img
           src={src}
           alt={alt}
@@ -417,13 +378,11 @@ const Banner: React.FC<{
           }}
         />
       )}
-      
-      {/* Loading skeleton */}
+
       {!isLoaded && !hasError && (
         <div className="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse" />
       )}
-      
-      {/* Error state */}
+
       {hasError && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
           <div className="text-center p-4">
@@ -436,7 +395,6 @@ const Banner: React.FC<{
   );
 };
 
-/** Enhanced ErrorBoundary */
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode; title?: string },
   { hasError: boolean; error?: any }
@@ -473,10 +431,9 @@ class ErrorBoundary extends React.Component<
   }
 }
 
-// Helper functions
 const getDefaultCategoryIcon = (categoryName: string): string => {
   const name = categoryName.toLowerCase();
-  
+
   if (name.includes('phone') || name.includes('simu')) return '📱';
   if (name.includes('tv') || name.includes('television')) return '📺';
   if (name.includes('sound') || name.includes('sauti')) return '🔊';
@@ -493,13 +450,13 @@ const getDefaultCategoryIcon = (categoryName: string): string => {
   if (name.includes('all') || name.includes('zote')) return '🛒';
   if (name.includes('electronics') || name.includes('umeme')) return '🔌';
   if (name.includes('accessories') || name.includes('vifaa')) return '🛍️';
-  
+
   return '🛒';
 };
 
 const normalizeCategory = (cat: any): Category => {
   const backendIcon = cat.icon || cat.icon_name || cat.icon_emoji || cat.icon_url;
-  
+
   return {
     id: String(cat.id || cat._id || `cat_${Date.now()}_${Math.random()}`),
     name: String(cat.name || cat.category_name || cat.title || 'Unnamed Category'),
@@ -511,12 +468,12 @@ const normalizeCategory = (cat: any): Category => {
 // Comments API Service
 class CommentsService {
   private static API_BASE = '/api/comments';
-  
+
   static async fetchComments(productId: string): Promise<Comment[]> {
     try {
       const response = await fetch(`${this.API_BASE}?productId=${encodeURIComponent(productId)}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      
+
       const data = await response.json();
       if (data.success && Array.isArray(data.data)) {
         return data.data.map((comment: any) => ({
@@ -539,7 +496,7 @@ class CommentsService {
       return [];
     }
   }
-  
+
   static async addComment(comment: Omit<Comment, 'id' | 'timestamp' | 'likes' | 'isLiked'>): Promise<Comment | null> {
     try {
       const response = await fetch(this.API_BASE, {
@@ -555,9 +512,9 @@ class CommentsService {
           textColor: comment.textColor,
         }),
       });
-      
+
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      
+
       const data = await response.json();
       if (data.success && data.data) {
         return {
@@ -580,7 +537,7 @@ class CommentsService {
       return null;
     }
   }
-  
+
   static async likeComment(commentId: string, userId: string): Promise<boolean> {
     try {
       const response = await fetch(`${this.API_BASE}/${commentId}/like`, {
@@ -588,9 +545,9 @@ class CommentsService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId }),
       });
-      
+
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      
+
       const data = await response.json();
       return data.success === true;
     } catch (error) {
@@ -598,15 +555,15 @@ class CommentsService {
       return false;
     }
   }
-  
+
   static async deleteComment(commentId: string): Promise<boolean> {
     try {
       const response = await fetch(`${this.API_BASE}/${commentId}`, {
         method: 'DELETE',
       });
-      
+
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      
+
       const data = await response.json();
       return data.success === true;
     } catch (error) {
@@ -616,7 +573,6 @@ class CommentsService {
   }
 }
 
-// Views API Service
 class ViewsService {
   private static API_BASE = '/api/views';
 
@@ -647,11 +603,11 @@ class ViewsService {
   }
 }
 
-// Main App Content with Router hooks
 const AppContent: React.FC = () => {
   const navigate = useNavigate();
-  const { productId } = useParams<{ productId: string }>();
-  
+  const location = useLocation();
+  const { productId, categoryId } = useParams<{ productId: string; categoryId: string }>();
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const [view, setView] = useState<
@@ -663,47 +619,39 @@ const AppContent: React.FC = () => {
     | 'search-results'
     | 'all-products'
     | 'barakasonko'
-  >('home');
+  >(() => getInitialViewFromPath(window.location.pathname) as any);
 
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [categoryProducts, setCategoryProducts] = useState<Product[]>([]);
-  
-  // Category-Product mapping for accurate filtering
   const [categoryProductMap, setCategoryProductMap] = useState<Record<string, Product[]>>({});
 
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  
-  // Comments state
+
   const [productComments, setProductComments] = useState<Record<string, Comment[]>>({});
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [isLoadingComments, setIsLoadingComments] = useState<Record<string, boolean>>({});
 
-  // Views state
   const [viewCounts, setViewCounts] = useState<Record<string, number>>({});
   const [isRecordingView, setIsRecordingView] = useState<Record<string, boolean>>({});
 
   const [isLoading, setIsLoading] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>();
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [routeReady, setRouteReady] = useState(false);
 
-  // Simple right-click prevention for product images only
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      // Check if the clicked element or its parent is a product image container
       const isProductImage = target.closest('.product-image-container') !== null;
-      if (isProductImage) {
-        e.preventDefault();
-      }
+      if (isProductImage) e.preventDefault();
     };
 
     document.addEventListener('contextmenu', handleContextMenu);
     return () => document.removeEventListener('contextmenu', handleContextMenu);
   }, []);
 
-  // Transform backend product data - ensure product IDs are preserved
   const normalizeProduct = (p: any, categoriesList: Category[]): Product => {
     const id = String(p?.id ?? p?._id ?? '');
     const price = Number(p?.price ?? 0);
@@ -722,9 +670,9 @@ const AppContent: React.FC = () => {
     } else {
       categoryName = String(
         p?.category_name ??
-          p?.categoryName ??
-          p?.category ??
-          ''
+        p?.categoryName ??
+        p?.category ??
+        ''
       ).trim();
 
       const maybe = String(p?.category ?? '').trim();
@@ -743,12 +691,12 @@ const AppContent: React.FC = () => {
 
     const getProductCategoryIcon = () => {
       if (categoryIcon) return categoryIcon;
-      
-      const matchingCat = categoriesList.find(c => 
+
+      const matchingCat = categoriesList.find(c =>
         c.name.toLowerCase() === categoryName.toLowerCase() ||
         c.name.toLowerCase() === category.toLowerCase()
       );
-      
+
       return matchingCat?.icon || getDefaultCategoryIcon(categoryName);
     };
 
@@ -767,27 +715,26 @@ const AppContent: React.FC = () => {
       images: Array.isArray(p?.images)
         ? p.images
         : Array.isArray(p?.image_urls)
-        ? p.image_urls
-        : Array.isArray(p?.image_urls_json)
-        ? p.image_urls_json
-        : [],
+          ? p.image_urls
+          : Array.isArray(p?.image_urls_json)
+            ? p.image_urls_json
+            : [],
       descriptionImages: Array.isArray(p?.descriptionImages)
         ? p.descriptionImages
         : Array.isArray(p?.description_images)
-        ? p.description_images
-        : [],
+          ? p.description_images
+          : [],
       videoUrl: String(p?.videoUrl ?? p?.video_url ?? ''),
     } as any;
   };
 
-  // Fetch initial data with cache - UPDATED to use /api/products?app=sound
   useEffect(() => {
     const initApp = async () => {
       try {
         setIsLoading(true);
         setFetchError(null);
+        setRouteReady(false);
 
-        // Try to load from cache first
         const cachedCategories = loadFromCache<Category[]>(CATEGORIES_CACHE_KEY);
         const cachedProducts = loadFromCache<Product[]>(PRODUCTS_CACHE_KEY);
 
@@ -809,13 +756,12 @@ const AppContent: React.FC = () => {
           return;
         }
 
-        // No cache or expired, fetch from API with ?app=sound parameter
         const [prodRes, catRes] = await Promise.all([
-          fetch('/api/products?app=sound', { 
-            headers: { Accept: 'application/json' } 
+          fetch('/api/products?app=sound', {
+            headers: { Accept: 'application/json' }
           }),
-          fetch('/api/categories?app=sound', { 
-            headers: { Accept: 'application/json' } 
+          fetch('/api/categories?app=sound', {
+            headers: { Accept: 'application/json' }
           }),
         ]);
 
@@ -845,7 +791,7 @@ const AppContent: React.FC = () => {
 
         if (prodData?.success) {
           const raw = Array.isArray(prodData.data) ? prodData.data : [];
-          const normalized = raw.map(p => normalizeProduct(p, normalizedCats));
+          const normalized = raw.map((p: any) => normalizeProduct(p, normalizedCats));
           setProducts(normalized);
           saveToCache(PRODUCTS_CACHE_KEY, normalized);
 
@@ -877,155 +823,84 @@ const AppContent: React.FC = () => {
     initApp();
   }, []);
 
-  // Handle direct product URL access
-  useEffect(() => {
-    if (productId && products.length > 0) {
-      const product = products.find(p => p.id === productId);
-      if (product) {
-        setSelectedProduct(product);
-        setView('product-detail');
-        
-        // Fetch comments for this product
-        fetchCommentsForProduct(product.id);
-        
-        // Record view
-        (async () => {
-          const viewerKey = getOrCreateUserId();
-          const newCount = await ViewsService.recordView(product.id, viewerKey);
-          setViewCounts(prev => ({ ...prev, [product.id]: newCount }));
-        })();
-      } else {
-        // Product not found, redirect to home
-        navigate('/', { replace: true });
-      }
-    }
-  }, [productId, products, navigate]);
-
-  // Build category-product map when data loads
   const buildCategoryProductMap = useCallback(() => {
     const map: Record<string, Product[]> = {};
-    
-    // Initialize empty arrays for all categories
+
     categories.forEach(cat => {
       map[cat.id] = [];
     });
-    
-    // Also ensure "Bidhaa Zote" (id: "14") exists
+
     if (!map["14"]) {
       map["14"] = [];
     }
-    
-    // Map each product to its category - preserve original product references
+
     products.forEach(product => {
       const productData = product as any;
-      
-      // Try multiple methods to find the correct category
       let matchedCategoryId: string | null = null;
-      
-      // Method 1: Check by category_id field
+
       if (productData.category_id) {
         const catId = String(productData.category_id).trim();
-        if (map[catId]) {
-          matchedCategoryId = catId;
-        }
+        if (map[catId]) matchedCategoryId = catId;
       }
-      
-      // Method 2: Check by categoryId field
+
       if (!matchedCategoryId && productData.categoryId) {
         const catId = String(productData.categoryId).trim();
-        if (map[catId]) {
-          matchedCategoryId = catId;
-        }
+        if (map[catId]) matchedCategoryId = catId;
       }
-      
-      // Method 3: Match by category name
+
       if (!matchedCategoryId) {
         const productCatName = (
-          productData.category_name || 
-          productData.categoryName || 
-          productData.category || 
+          productData.category_name ||
+          productData.categoryName ||
+          productData.category ||
           ''
         ).toLowerCase().trim();
-        
-        const matchingCat = categories.find(cat => 
+
+        const matchingCat = categories.find(cat =>
           cat.name.toLowerCase().trim() === productCatName
         );
-        
-        if (matchingCat) {
-          matchedCategoryId = matchingCat.id;
-        }
+
+        if (matchingCat) matchedCategoryId = matchingCat.id;
       }
-      
-      // Method 4: Manual matching based on title keywords
+
       if (!matchedCategoryId) {
         const title = (productData.title || '').toLowerCase();
-        
-        // Mic category (id: "3")
+
         if (title.includes('mic') || title.includes('microphone')) {
-          // Exclude accessories
-          if (!title.includes('cable') && !title.includes('wire') && 
+          if (!title.includes('cable') && !title.includes('wire') &&
               !title.includes('stand') && !title.includes('stendi')) {
             matchedCategoryId = "3";
           }
-        }
-        
-        // Spika category (id: "2")
-        else if (title.includes('spika') || title.includes('speaker') || title.includes('sound')) {
+        } else if (title.includes('spika') || title.includes('speaker') || title.includes('sound')) {
           matchedCategoryId = "2";
-        }
-        
-        // TV category (id: "6")
-        else if (title.includes('tv') || title.includes('television')) {
+        } else if (title.includes('tv') || title.includes('television')) {
           matchedCategoryId = "6";
-        }
-        
-        // Mobile accessories (id: "7")
-        else if (title.includes('charger') || title.includes('adapter') || 
-                 title.includes('cable') || title.includes('wire')) {
+        } else if (title.includes('charger') || title.includes('adapter') ||
+                   title.includes('cable') || title.includes('wire')) {
           matchedCategoryId = "7";
-        }
-        
-        // TV accessories (id: "8")
-        else if (title.includes('tv stand') || title.includes('tv bracket') || 
-                 title.includes('tv stendi')) {
+        } else if (title.includes('tv stand') || title.includes('tv bracket') ||
+                   title.includes('tv stendi')) {
           matchedCategoryId = "8";
-        }
-        
-        // Guitars (id: "9")
-        else if (title.includes('gitaa') || title.includes('guitar')) {
+        } else if (title.includes('gitaa') || title.includes('guitar')) {
           matchedCategoryId = "9";
-        }
-        
-        // Drums (id: "11")
-        else if (title.includes('tumba') || title.includes('drum') || 
-                 title.includes('manyanga') || title.includes('dufu')) {
+        } else if (title.includes('tumba') || title.includes('drum') ||
+                   title.includes('manyanga') || title.includes('dufu')) {
           matchedCategoryId = "11";
-        }
-        
-        // Mixers (id: "12")
-        else if (title.includes('mixer') || title.includes('mixing')) {
+        } else if (title.includes('mixer') || title.includes('mixing')) {
           matchedCategoryId = "12";
-        }
-        
-        // Spares (id: "13")
-        else if (title.includes('battery') || title.includes('betri') || 
-                 title.includes('jack') || title.includes('spare')) {
+        } else if (title.includes('battery') || title.includes('betri') ||
+                   title.includes('jack') || title.includes('spare')) {
           matchedCategoryId = "13";
         }
       }
-      
-      // Add product to its category map - use the original product reference
+
       if (matchedCategoryId && map[matchedCategoryId]) {
         map[matchedCategoryId].push(product);
-      } else {
-        // If no category found, put in "Bidhaa Zote"
-        if (map["14"]) {
-          map["14"].push(product);
-        }
+      } else if (map["14"]) {
+        map["14"].push(product);
       }
     });
-    
-    // Remove duplicates while preserving original references
+
     Object.keys(map).forEach(catId => {
       const seen = new Set();
       map[catId] = map[catId].filter(p => {
@@ -1034,19 +909,17 @@ const AppContent: React.FC = () => {
         return !duplicate;
       });
     });
-    
+
     setCategoryProductMap(map);
     console.log('✅ Category product map built');
   }, [products, categories]);
 
-  // Build map when products and categories are loaded
   useEffect(() => {
     if (products.length > 0 && categories.length > 0) {
       buildCategoryProductMap();
     }
   }, [products, categories, buildCategoryProductMap]);
 
-  // Search Logic
   const filteredProducts = useMemo(() => {
     if (!searchQuery.trim()) return [];
     const q = searchQuery.toLowerCase();
@@ -1067,23 +940,17 @@ const AppContent: React.FC = () => {
     navigate('/');
   };
 
-  // Use pre-built category map for accurate filtering
   const handleCategorySelect = (category: Category) => {
     setIsSidebarOpen(false);
-    
-    // Handle "Bidhaa Zote" - show all products
+
     if (category.id === '14' || category.name === 'Bidhaa Zote') {
       setView('all-products');
       navigate('/all-products');
       window.scrollTo(0, 0);
       return;
     }
-    
-    // Get products directly from the pre-built map - these are original product references
+
     const productsForCategory = categoryProductMap[category.id] || [];
-    
-    console.log(`📌 Category "${category.name}" has ${productsForCategory.length} products`);
-    
     setCategoryProducts(productsForCategory);
     setSelectedCategory(category);
     setView('category-results');
@@ -1091,7 +958,6 @@ const AppContent: React.FC = () => {
     window.scrollTo(0, 0);
   };
 
-  // Helper functions for user management
   const getOrCreateUserId = (): string => {
     let userId = localStorage.getItem('sonko_user_id');
     if (!userId) {
@@ -1101,10 +967,9 @@ const AppContent: React.FC = () => {
     return userId;
   };
 
-  // Generate anonymous user for logged-out users
   const generateAnonymousUser = () => {
     const userId = getOrCreateUserId();
-    
+
     const colors = [
       { bg: 'bg-blue-100', text: 'text-blue-600' },
       { bg: 'bg-green-100', text: 'text-green-600' },
@@ -1115,7 +980,7 @@ const AppContent: React.FC = () => {
       { bg: 'bg-indigo-100', text: 'text-indigo-600' },
       { bg: 'bg-yellow-100', text: 'text-yellow-600' },
     ];
-    
+
     const seed = userId.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
     const idx = seed % colors.length;
 
@@ -1128,16 +993,14 @@ const AppContent: React.FC = () => {
     };
   };
 
-  // Comments API integration
   const fetchCommentsForProduct = async (productId: string) => {
     if (isLoadingComments[productId]) return;
-    
+
     setIsLoadingComments(prev => ({ ...prev, [productId]: true }));
-    
+
     try {
       const comments = await CommentsService.fetchComments(productId);
       setProductComments(prev => ({ ...prev, [productId]: comments }));
-      
       setCommentCounts(prev => ({ ...prev, [productId]: comments.length }));
     } catch (error) {
       console.error('Failed to fetch comments:', error);
@@ -1149,10 +1012,8 @@ const AppContent: React.FC = () => {
   const handleAddComment = async (productId: string, content: string) => {
     try {
       const isLoggedIn = !!user;
-
       const displayName = isLoggedIn ? 'Baraka Sonko Electronics' : 'Mteja';
       const initials = isLoggedIn ? 'BS' : 'MT';
-
       const anon = generateAnonymousUser();
       const userId = isLoggedIn ? String(user?.id || 'admin') : anon.id;
 
@@ -1191,7 +1052,7 @@ const AppContent: React.FC = () => {
     try {
       const userId = getOrCreateUserId();
       const success = await CommentsService.likeComment(commentId, userId);
-      
+
       if (success) {
         setProductComments(prev => ({
           ...prev,
@@ -1217,18 +1078,18 @@ const AppContent: React.FC = () => {
   const handleDeleteComment = async (commentId: string, productId: string) => {
     try {
       const success = await CommentsService.deleteComment(commentId);
-      
+
       if (success) {
         setProductComments(prev => ({
           ...prev,
           [productId]: (prev[productId] || []).filter(comment => comment.id !== commentId)
         }));
-        
+
         setCommentCounts(prev => ({
           ...prev,
           [productId]: Math.max(0, (prev[productId] || 0) - 1)
         }));
-        
+
         return true;
       }
     } catch (error) {
@@ -1240,8 +1101,7 @@ const AppContent: React.FC = () => {
   const handleProductClick = (product: Product) => {
     setSelectedProduct(product);
     setView('product-detail');
-    
-    // Update URL to product-specific path
+    setRouteReady(true);
     navigate(`/product/${product.id}`);
 
     fetchCommentsForProduct(product.id);
@@ -1288,7 +1148,6 @@ const AppContent: React.FC = () => {
     }
   }, [selectedProduct?.id, isRecordingView]);
 
-  // Admin session
   const [user, setUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('sonko_user');
     return saved ? JSON.parse(saved) : null;
@@ -1318,15 +1177,8 @@ const AppContent: React.FC = () => {
           return updated;
         });
 
-        setCommentCounts(prev => ({
-          ...prev,
-          [saved.id]: 0
-        }));
-
-        setViewCounts(prev => ({
-          ...prev,
-          [saved.id]: 0
-        }));
+        setCommentCounts(prev => ({ ...prev, [saved.id]: 0 }));
+        setViewCounts(prev => ({ ...prev, [saved.id]: 0 }));
 
         return true;
       }
@@ -1389,6 +1241,7 @@ const AppContent: React.FC = () => {
     if (!user) setShowAuth(true);
     else {
       setView('admin');
+      setRouteReady(true);
       navigate('/admin');
     }
   };
@@ -1398,6 +1251,7 @@ const AppContent: React.FC = () => {
     localStorage.setItem('sonko_user', JSON.stringify(newUser));
     setShowAuth(false);
     setView('admin');
+    setRouteReady(true);
     navigate('/admin');
   };
 
@@ -1405,11 +1259,14 @@ const AppContent: React.FC = () => {
     setUser(null);
     localStorage.removeItem('sonko_user');
     setView('home');
+    setRouteReady(true);
     navigate('/');
   };
 
   const handleBackToHome = () => {
+    setSelectedProduct(null);
     setView('home');
+    setRouteReady(true);
     navigate('/');
   };
 
@@ -1418,50 +1275,126 @@ const AppContent: React.FC = () => {
     window.location.reload();
   };
 
-  // Handler for Barakasonko click
   const handleBarakasonkoClick = () => {
-    console.log('Barakasonko clicked - opening Barakasonko page');
     setView('barakasonko');
+    setRouteReady(true);
     navigate('/barakasonko');
   };
 
-  // Handler for Sonko click (return to home)
   const handleSonkoClick = () => {
-    console.log('Sonko clicked - returning to home');
     setView('home');
+    setRouteReady(true);
     navigate('/');
   };
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    const pathView = getInitialViewFromPath(location.pathname) as any;
+
+    if (location.pathname === '/') {
+      setSelectedProduct(null);
+      setView(searchQuery ? 'search-results' : 'home');
+      setRouteReady(true);
+      return;
+    }
+
+    if (location.pathname.startsWith('/all-products')) {
+      setView('all-products');
+      setRouteReady(true);
+      return;
+    }
+
+    if (location.pathname.startsWith('/categories')) {
+      setView('categories');
+      setRouteReady(true);
+      return;
+    }
+
+    if (location.pathname.startsWith('/admin')) {
+      setView('admin');
+      setRouteReady(true);
+      return;
+    }
+
+    if (location.pathname.startsWith('/barakasonko')) {
+      setView('barakasonko');
+      setRouteReady(true);
+      return;
+    }
+
+    if (location.pathname.startsWith('/product/')) {
+      if (!productId) {
+        navigate('/', { replace: true });
+        return;
+      }
+
+      const product = products.find(p => String(p.id) === String(productId));
+
+      if (product) {
+        setSelectedProduct(product);
+        setView('product-detail');
+        setRouteReady(true);
+
+        fetchCommentsForProduct(product.id);
+
+        (async () => {
+          const viewerKey = getOrCreateUserId();
+          const newCount = await ViewsService.recordView(product.id, viewerKey);
+          setViewCounts(prev => ({ ...prev, [product.id]: newCount }));
+        })();
+      } else {
+        navigate('/', { replace: true });
+      }
+      return;
+    }
+
+    if (location.pathname.startsWith('/category/')) {
+      if (!categoryId) {
+        navigate('/', { replace: true });
+        return;
+      }
+
+      const foundCategory = categories.find(c => String(c.id) === String(categoryId));
+      if (foundCategory) {
+        const productsForCategory = categoryProductMap[foundCategory.id] || [];
+        setSelectedCategory(foundCategory);
+        setCategoryProducts(productsForCategory);
+        setView('category-results');
+        setRouteReady(true);
+      } else {
+        navigate('/', { replace: true });
+      }
+      return;
+    }
+
+    setView(pathView);
+    setRouteReady(true);
+  }, [isLoading, location.pathname, productId, categoryId, products, categories, categoryProductMap, navigate, searchQuery]);
 
   const navView =
     view === 'admin'
       ? 'admin'
       : view === 'categories'
-      ? 'categories'
-      : view === 'all-products'
-      ? 'all-products'
-      : view === 'search-results'
-      ? 'search-results'
-      : view === 'category-results'
-      ? 'categories'
-      : view === 'barakasonko'
-      ? 'home'
-      : 'home';
+        ? 'categories'
+        : view === 'all-products'
+          ? 'all-products'
+          : view === 'search-results'
+            ? 'search-results'
+            : view === 'category-results'
+              ? 'categories'
+              : view === 'barakasonko'
+                ? 'home'
+                : 'home';
 
-  // Updated loader with speaker design and SONKO SOUND branding
-  if (isLoading && view !== 'category-results' && view !== 'barakasonko') {
+  if ((isLoading || !routeReady) && view !== 'category-results' && view !== 'barakasonko') {
     return (
       <div className="fixed inset-0 bg-gradient-to-br from-[#f7f7f7] via-white to-[#f3f3f3] flex items-center justify-center px-6 z-[999]">
         <div className="relative flex flex-col items-center">
-          {/* Glow */}
           <div className="absolute w-40 h-40 rounded-full bg-[#f26b2e]/10 blur-3xl animate-pulse" />
-
-          {/* Logo + Brand */}
           <div className="relative flex flex-col items-center">
             <div className="relative w-24 h-24 flex items-center justify-center">
-              {/* Outer ring */}
               <div className="absolute inset-0 rounded-full border-[6px] border-[#f26b2e] opacity-95 animate-[spin_6s_linear_infinite]" />
-
-              {/* Inner speaker body */}
               <div className="relative w-16 h-16 rounded-full bg-white shadow-[0_8px_30px_rgba(242,107,46,0.18)] border border-[#ececec] flex items-center justify-center">
                 <svg
                   viewBox="0 0 64 64"
@@ -1469,11 +1402,8 @@ const AppContent: React.FC = () => {
                   fill="none"
                   xmlns="http://www.w3.org/2000/svg"
                 >
-                  {/* Speaker box */}
                   <rect x="16" y="22" width="14" height="20" rx="3" fill="#f26b2e" />
                   <path d="M30 27L40 20V44L30 37V27Z" fill="#f26b2e" />
-
-                  {/* Sound waves */}
                   <path
                     d="M44 25C47 27.5 49 31 49 32C49 33 47 36.5 44 39"
                     stroke="#f26b2e"
@@ -1491,7 +1421,6 @@ const AppContent: React.FC = () => {
                 </svg>
               </div>
 
-              {/* Animated sound bars */}
               <div className="absolute -right-10 flex items-end gap-1 h-10">
                 <span className="w-1.5 rounded-full bg-[#f26b2e] animate-[soundBar_0.9s_ease-in-out_infinite]" />
                 <span className="w-1.5 rounded-full bg-[#f59a6a] animate-[soundBar_0.9s_ease-in-out_infinite_0.15s]" />
@@ -1499,7 +1428,6 @@ const AppContent: React.FC = () => {
               </div>
             </div>
 
-            {/* Brand text */}
             <div className="mt-6 text-center">
               <h1 className="text-[34px] leading-none font-black tracking-[0.18em] text-[#f26b2e] drop-shadow-sm">
                 SONKO
@@ -1553,7 +1481,6 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="relative min-h-screen bg-white">
-      {/* Product Detail View */}
       {view === 'product-detail' && selectedProduct && (
         <ProductDetailView
           product={selectedProduct}
@@ -1575,17 +1502,14 @@ const AppContent: React.FC = () => {
         />
       )}
 
-      {/* Auth View */}
       {showAuth && <AuthView onLogin={handleLogin} onBack={() => setShowAuth(false)} />}
 
-      {/* Sidebar */}
       <Sidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
         onCategorySelect={handleCategorySelect}
       />
 
-      {/* Header - Updated with both click handlers */}
       {view !== 'product-detail' && (
         <Header
           onMenuClick={() => setIsSidebarOpen(true)}
@@ -1620,7 +1544,6 @@ const AppContent: React.FC = () => {
               }}
             />
 
-            {/* Flash Sale */}
             <FlashSale
               products={products}
               onProductClick={handleProductClick}
@@ -1704,8 +1627,8 @@ const AppContent: React.FC = () => {
               </div>
             )}
 
-            <ProductGrid 
-              products={filteredProducts} 
+            <ProductGrid
+              products={filteredProducts}
               onProductClick={handleProductClick}
               WatermarkedImage={WatermarkedImage}
             />
@@ -1735,7 +1658,6 @@ const AppContent: React.FC = () => {
         ) : null}
       </main>
 
-      {/* Bottom Nav */}
       {view !== 'product-detail' && (
         <BottomNav
           currentView={navView as any}
@@ -1743,19 +1665,21 @@ const AppContent: React.FC = () => {
             if (v === 'admin') handleAdminAccess();
             else if (v === 'home') {
               setView('home');
+              setRouteReady(true);
               navigate('/');
             } else if (v === 'categories') {
               setView('categories');
+              setRouteReady(true);
               navigate('/categories');
             } else if (v === 'all-products') {
               setView('all-products');
+              setRouteReady(true);
               navigate('/all-products');
             }
           }}
         />
       )}
 
-      {/* Copyright Footer */}
       <div className="fixed bottom-0 left-0 right-0 bg-black text-white text-center py-2 text-xs z-40">
         ©SonkoSound - Product images protected
       </div>
@@ -1763,7 +1687,6 @@ const AppContent: React.FC = () => {
   );
 };
 
-// Main App component with Router
 const App: React.FC = () => {
   return (
     <BrowserRouter>
