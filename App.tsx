@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, useNavigate, useParams, Navigate } from '
 import Header from './components/Header';
 import QuickActions from './components/QuickActions';
 import CategorySection from './components/CategorySection';
+import FlashSale from './components/FlashSale';
 import ProductGrid from './components/ProductGrid';
 import BottomNav from './components/BottomNav';
 import Sidebar from './components/Sidebar';
@@ -777,7 +778,7 @@ const AppContent: React.FC = () => {
     } as any;
   };
 
-  // Fetch initial data with cache
+  // Fetch initial data with cache - UPDATED to use /api/products?app=sound
   useEffect(() => {
     const initApp = async () => {
       try {
@@ -806,10 +807,14 @@ const AppContent: React.FC = () => {
           return;
         }
 
-        // No cache or expired, fetch from API
+        // No cache or expired, fetch from API with ?app=sound parameter
         const [prodRes, catRes] = await Promise.all([
-          fetch('/api/products', { headers: { Accept: 'application/json' } }),
-          fetch('/api/categories?app=sound', { headers: { Accept: 'application/json' } }),
+          fetch('/api/products?app=sound', { 
+            headers: { Accept: 'application/json' } 
+          }),
+          fetch('/api/categories?app=sound', { 
+            headers: { Accept: 'application/json' } 
+          }),
         ]);
 
         const prodData = await prodRes.json().catch(() => ({
@@ -1324,7 +1329,7 @@ const AppContent: React.FC = () => {
         return true;
       }
 
-      const prodRes = await fetch('/api/products');
+      const prodRes = await fetch('/api/products?app=sound');
       const prodData = await prodRes.json().catch(() => null);
 
       if (prodData?.success) {
@@ -1587,6 +1592,17 @@ const AppContent: React.FC = () => {
                 setView('categories');
                 navigate('/categories');
               }}
+            />
+
+            {/* Flash Sale - RESTORED */}
+            <FlashSale
+              products={products}
+              onProductClick={handleProductClick}
+              onSeeAll={() => {
+                setView('all-products');
+                navigate('/all-products');
+              }}
+              WatermarkedImage={WatermarkedImage}
             />
 
             <ProductGrid
