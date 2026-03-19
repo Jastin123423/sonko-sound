@@ -37,158 +37,174 @@ const productPrice = (p: any) => {
 
 /**
  * ==========================================================
- * ✅ RotatingRow (NON scrollable, very slow)
- * - duplicates list to create seamless loop
- * - full width (no side gaps)
+ * ✅ FeaturedSlider - Beautiful classic slider with navigation
  * ==========================================================
  */
-const RotatingRow: React.FC<{
-  title: string;
+const FeaturedSlider: React.FC<{
   items: Product[];
   onClick: (p: Product) => void;
-  intervalMs?: number;
-}> = ({ title, items, onClick, intervalMs = 15000 }) => {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [containerW, setContainerW] = useState(0);
-  const [index, setIndex] = useState(0);
-  const [animate, setAnimate] = useState(true);
-
-  const GAP = 10;
-  const CARD_W = 132;
-
+}> = ({ items, onClick }) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [touchStart, setTouchStart] = useState(0);
+  const [touchEnd, setTouchEnd] = useState(0);
+  
+  const featured = useMemo(() => items.slice(0, 8), [items]);
+  
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
+    if (featured.length <= 1) return;
+    
+    const timer = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % featured.length);
+    }, 5000);
+    
+    return () => clearInterval(timer);
+  }, [featured.length]);
 
-    const ro = new ResizeObserver(() => setContainerW(el.clientWidth));
-    ro.observe(el);
-    setContainerW(el.clientWidth);
-    return () => ro.disconnect();
-  }, []);
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStart(e.targetTouches[0].clientX);
+  };
 
-  const cleanItems = useMemo(() => (items || []).filter(Boolean), [items]);
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
 
-  const perView = useMemo(() => {
-    if (!containerW) return 3;
-    const n = Math.floor((containerW + GAP) / (CARD_W + GAP));
-    return Math.max(1, Math.min(4, n));
-  }, [containerW]);
-
-  const canRotate = cleanItems.length > perView;
-
-  const loopItems = useMemo(() => {
-    if (cleanItems.length === 0) return [];
-    return [...cleanItems, ...cleanItems, ...cleanItems];
-  }, [cleanItems]);
-
-  // Start in the middle copy
-  useEffect(() => {
-    if (!canRotate) {
-      setIndex(0);
-      return;
+  const handleTouchEnd = () => {
+    if (touchStart - touchEnd > 75) {
+      // Swipe left
+      setCurrentIndex((prev) => (prev + 1) % featured.length);
     }
-    setIndex(cleanItems.length);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canRotate, cleanItems.length]);
-
-  // Auto rotate slowly
-  useEffect(() => {
-    if (!canRotate) return;
-    const t = setInterval(() => setIndex((prev) => prev + 1), intervalMs);
-    return () => clearInterval(t);
-  }, [canRotate, intervalMs]);
-
-  // Snap back seamlessly
-  useEffect(() => {
-    if (!canRotate) return;
-    const baseLen = cleanItems.length;
-    if (index >= baseLen * 2) {
-      setAnimate(false);
-      setIndex(baseLen);
-      requestAnimationFrame(() => requestAnimationFrame(() => setAnimate(true)));
+    if (touchStart - touchEnd < -75) {
+      // Swipe right
+      setCurrentIndex((prev) => (prev - 1 + featured.length) % featured.length);
     }
-  }, [index, canRotate, cleanItems.length]);
+  };
 
-  const translateX = -(index * (CARD_W + GAP));
+  const goToSlide = (index: number) => {
+    setCurrentIndex(index);
+  };
+
+  const goToPrev = () => {
+    setCurrentIndex((prev) => (prev - 1 + featured.length) % featured.length);
+  };
+
+  const goToNext = () => {
+    setCurrentIndex((prev) => (prev + 1) % featured.length);
+  };
+
+  if (featured.length === 0) return null;
+
+  const currentProduct = featured[currentIndex];
 
   return (
-    <div className="w-full overflow-hidden">
-      <div className="flex items-center justify-between px-4 pt-3 pb-2">
-        <div className="flex items-center gap-2">
-          <span className="text-[15px] font-black text-white">{title}</span>
-          {canRotate && (
-            <span className="text-[11px] font-black text-white/80">• Inajizungusha polepole</span>
-          )}
-        </div>
-        <div className="text-[11px] font-black text-white/80">Upcoming</div>
+    <div className="relative w-full bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 overflow-hidden">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 opacity-10">
+        <div className="absolute top-0 left-0 w-64 h-64 bg-orange-500 rounded-full filter blur-3xl" />
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-500 rounded-full filter blur-3xl" />
       </div>
 
-      <div ref={containerRef} className="w-full px-4 pb-4">
-        <div className="overflow-hidden rounded-2xl">
-          <div
-            className="flex"
-            style={{
-              gap: `${GAP}px`,
-              transform: `translateX(${translateX}px)`,
-              transition: animate ? 'transform 900ms ease-in-out' : 'none',
-              willChange: 'transform',
-              padding: '10px',
-              touchAction: 'pan-y',
-            }}
-          >
-            {loopItems.map((p: any, i) => {
-              const img = productImage(p);
-              const price = productPrice(p);
-              const priceStr = price ? price.toLocaleString() : '—';
-
-              return (
-                <button
-                  key={`${String(p?.id ?? 'p')}-${i}`}
-                  onClick={() => onClick(p)}
-                  className="flex-shrink-0 bg-white rounded-2xl overflow-hidden text-left active:scale-[0.99] transition-transform border border-white/40"
-                  style={{ width: CARD_W }}
-                >
-                  <div className="relative w-full h-[92px] bg-gray-100">
-                    {img ? (
-                      <img
-                        src={img}
-                        alt={productTitle(p)}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-[11px] text-gray-400 font-bold">
-                        No image
-                      </div>
-                    )}
-
-                    <div
-                      className="absolute top-2 left-2 px-2 py-1 rounded-full text-[10px] font-black text-white shadow"
-                      style={{ backgroundColor: COLORS.primary }}
-                    >
-                      Low stocks
-                    </div>
-                  </div>
-
-                  <div className="px-2.5 py-2">
-                    <div className="text-[11px] font-black text-gray-900 line-clamp-2 leading-tight">
-                      {productTitle(p)}
-                    </div>
-
-                    <div className="mt-1 text-[12px] font-black" style={{ color: COLORS.primary }}>
-                      TSh {priceStr}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
+      <div className="relative max-w-[600px] mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <p className="text-orange-400 text-xs font-bold tracking-[0.3em] uppercase mb-2">
+              Featured Collection
+            </p>
+            <h2 className="text-2xl font-black text-white tracking-tight">
+              Bidhaa Zote
+            </h2>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-gray-400 font-medium">
+              {currentIndex + 1} / {featured.length}
+            </span>
           </div>
         </div>
 
-        {canRotate && (
-          <div className="mt-2 flex items-center justify-center gap-1.5 opacity-90">
-            {Array.from({ length: Math.min(6, cleanItems.length) }).map((_, d) => (
-              <div key={d} className="h-1.5 w-1.5 rounded-full bg-white/70" />
+        {/* Main Slider */}
+        <div 
+          className="relative"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          <div className="relative aspect-[16/9] rounded-2xl overflow-hidden bg-gray-800 shadow-2xl">
+            {/* Product Image */}
+            {productImage(currentProduct) ? (
+              <img
+                src={productImage(currentProduct)}
+                alt={productTitle(currentProduct)}
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-gray-700">
+                <span className="text-gray-400 text-sm font-bold">No image available</span>
+              </div>
+            )}
+
+            {/* Overlay Gradient */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+
+            {/* Product Info */}
+            <div className="absolute bottom-0 left-0 right-0 p-6">
+              <h3 className="text-xl font-black text-white mb-2 line-clamp-2">
+                {productTitle(currentProduct)}
+              </h3>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-300 font-medium mb-1">Starting from</p>
+                  <p className="text-2xl font-black text-orange-400">
+                    TSh {productPrice(currentProduct).toLocaleString()}
+                  </p>
+                </div>
+                <button
+                  onClick={() => onClick(currentProduct)}
+                  className="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-black rounded-xl transition-colors shadow-lg"
+                >
+                  View Deal
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Navigation Arrows (Desktop) */}
+          {featured.length > 1 && (
+            <>
+              <button
+                onClick={goToPrev}
+                className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white rounded-full items-center justify-center transition-all"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <button
+                onClick={goToNext}
+                className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white rounded-full items-center justify-center transition-all"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Dots Navigation */}
+        {featured.length > 1 && (
+          <div className="flex items-center justify-center gap-2 mt-6">
+            {featured.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => goToSlide(idx)}
+                className={`transition-all ${
+                  idx === currentIndex
+                    ? 'w-8 h-2 bg-orange-500 rounded-full'
+                    : 'w-2 h-2 bg-gray-600 hover:bg-gray-500 rounded-full'
+                }`}
+                aria-label={`Go to slide ${idx + 1}`}
+              />
             ))}
           </div>
         )}
@@ -199,228 +215,251 @@ const RotatingRow: React.FC<{
 
 /**
  * ==========================================================
- * ✅ BrandDealsShowcase (Professional)
- * - shows 3 DIFFERENT products at a time (not repeating)
- * - changes VERY slowly
- * - no horizontal scroll
+ * ✅ CategoryStrip - Beautiful category pills
  * ==========================================================
  */
-const BrandDealsShowcase: React.FC<{
-  items: Product[];
-  onClick: (p: Product) => void;
-  intervalMs?: number;
-}> = ({ items, onClick, intervalMs = 22000 }) => {
-  const clean = useMemo(() => (items || []).filter(Boolean), [items]);
-  const [start, setStart] = useState(0);
-
-  // Move forward by 3 each time so you see different products
-  useEffect(() => {
-    if (clean.length <= 3) return;
-
-    const t = setInterval(() => {
-      setStart((prev) => (prev + 3) % clean.length);
-    }, intervalMs);
-
-    return () => clearInterval(t);
-  }, [clean.length, intervalMs]);
-
-  const view3 = useMemo(() => {
-    if (clean.length === 0) return [];
-    const a = clean[start % clean.length];
-    const b = clean[(start + 1) % clean.length];
-    const c = clean[(start + 2) % clean.length];
-
-    // ensure uniqueness even if length is small
-    const unique: any[] = [];
-    [a, b, c].forEach((x) => {
-      if (!x) return;
-      const id = String((x as any).id ?? '');
-      if (!unique.some((u) => String((u as any).id ?? '') === id)) unique.push(x);
+const CategoryStrip: React.FC<{
+  products: Product[];
+  onSelect: (category: string) => void;
+}> = ({ products, onSelect }) => {
+  const categories = useMemo(() => {
+    const catSet = new Set<string>();
+    products.forEach(p => {
+      if ((p as any).category_name) catSet.add((p as any).category_name);
+      else if (p.category) catSet.add(p.category);
     });
+    return Array.from(catSet).slice(0, 12);
+  }, [products]);
 
-    return unique.slice(0, 3);
-  }, [clean, start]);
+  if (categories.length === 0) return null;
 
   return (
-    <div className="w-full overflow-hidden">
-      <div className="flex items-center justify-between px-4 pt-3 pb-2">
-        <div className="flex items-center gap-2">
-          <span className="text-[15px] font-black text-white">Brand Deals</span>
-          {clean.length > 3 && (
-            <span className="text-[11px] font-black text-white/80">• Inabadilika polepole</span>
-          )}
+    <div className="bg-white border-b border-gray-200">
+      <div className="max-w-[600px] mx-auto px-4 py-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-black text-gray-900">Browse by Category</h3>
+          <span className="text-xs text-orange-500 font-bold">{categories.length} categories</span>
         </div>
-        <div className="text-[11px] font-black text-white/80">Selected</div>
-      </div>
-
-      {/* 3-card professional row */}
-      <div className="px-4 pb-4">
-        <div className="grid grid-cols-3 gap-2">
-          {view3.map((p: any) => {
-            const img = productImage(p);
-            const price = productPrice(p);
-            const priceStr = price ? price.toLocaleString() : '—';
-
-            return (
-              <button
-                key={String(p?.id ?? Math.random())}
-                onClick={() => onClick(p)}
-                className="bg-white/95 rounded-2xl overflow-hidden text-left border border-white/30 shadow-sm active:scale-[0.99] transition-transform"
-              >
-                <div className="relative w-full aspect-square bg-white">
-                  {img ? (
-                    <img src={img} alt={productTitle(p)} className="w-full h-full object-cover" loading="lazy" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-[11px] text-gray-400 font-bold">
-                      No image
-                    </div>
-                  )}
-
-                  {/* Verified / Brand badge */}
-                  <div className="absolute top-2 left-2 px-2 py-1 rounded-full text-[10px] font-black bg-white/90 text-gray-900 shadow">
-                    ✓ Brand
-                  </div>
-                </div>
-
-                <div className="px-2.5 py-2">
-                  <div className="text-[10px] font-black text-gray-900 line-clamp-2 leading-tight">
-                    {productTitle(p)}
-                  </div>
-                  <div className="mt-1 text-[11px] font-black" style={{ color: COLORS.primary }}>
-                    TSh {priceStr}
-                  </div>
-                </div>
-              </button>
-            );
-          })}
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+          {categories.map((cat, idx) => (
+            <button
+              key={idx}
+              onClick={() => onSelect(cat)}
+              className="px-4 py-2 bg-gray-100 hover:bg-orange-50 text-gray-700 hover:text-orange-600 font-bold text-xs rounded-full whitespace-nowrap transition-colors border border-gray-200 hover:border-orange-200"
+            >
+              {cat}
+            </button>
+          ))}
+          <button
+            onClick={() => onSelect('all')}
+            className="px-4 py-2 bg-orange-500 text-white font-bold text-xs rounded-full whitespace-nowrap hover:bg-orange-600 transition-colors"
+          >
+            View All
+          </button>
         </div>
-
-        {clean.length > 3 && (
-          <div className="mt-2 flex items-center justify-center gap-1.5 opacity-90">
-            {Array.from({ length: 6 }).map((_, d) => (
-              <div key={d} className="h-1.5 w-1.5 rounded-full bg-white/70" />
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
 };
 
+/**
+ * ==========================================================
+ * ✅ StatsBar - Beautiful stats display
+ * ==========================================================
+ */
+const StatsBar: React.FC<{
+  totalProducts: number;
+}> = ({ totalProducts }) => {
+  const stats = [
+    { label: 'Total Products', value: totalProducts.toLocaleString(), icon: '📦' },
+    { label: 'Flash Deals', value: Math.min(24, totalProducts).toLocaleString(), icon: '⚡' },
+    { label: 'New Arrivals', value: Math.min(12, totalProducts).toLocaleString(), icon: '🆕' },
+  ];
+
+  return (
+    <div className="bg-white border-b border-gray-200">
+      <div className="max-w-[600px] mx-auto px-4 py-4">
+        <div className="grid grid-cols-3 gap-3">
+          {stats.map((stat, idx) => (
+            <div key={idx} className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100">
+              <div className="text-xl mb-1">{stat.icon}</div>
+              <div className="text-sm font-black text-gray-900">{stat.value}</div>
+              <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wider mt-1">
+                {stat.label}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * ==========================================================
+ * ✅ HeroBanner - Beautiful top banner
+ * ==========================================================
+ */
+const HeroBanner: React.FC<{
+  onExploreClick: () => void;
+}> = ({ onExploreClick }) => {
+  return (
+    <div className="relative bg-gradient-to-br from-orange-500 to-orange-600 overflow-hidden">
+      {/* Decorative elements */}
+      <div className="absolute top-0 left-0 w-32 h-32 bg-white/5 rounded-full -translate-x-16 -translate-y-16" />
+      <div className="absolute bottom-0 right-0 w-48 h-48 bg-white/5 rounded-full translate-x-24 translate-y-24" />
+      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-white/5 rounded-full" />
+
+      <div className="relative max-w-[600px] mx-auto px-4 py-8">
+        <div className="flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="px-2 py-1 bg-white/20 backdrop-blur-sm text-white text-[10px] font-black rounded-full">
+                SONKO SOUND
+              </span>
+              <span className="px-2 py-1 bg-white/20 backdrop-blur-sm text-white text-[10px] font-black rounded-full">
+                OFFICIAL
+              </span>
+            </div>
+            <h1 className="text-3xl font-black text-white mb-2 leading-tight">
+              Baraka Sonko<br />Electronics
+            </h1>
+            <p className="text-orange-100 text-sm mb-4 max-w-xs">
+              Premium audio gear, electronics, and accessories at the best prices in town.
+            </p>
+            <button
+              onClick={onExploreClick}
+              className="px-6 py-3 bg-white text-orange-600 font-black rounded-xl hover:bg-orange-50 transition-colors shadow-lg"
+            >
+              Explore Collection
+            </button>
+          </div>
+          <div className="hidden sm:block text-right">
+            <div className="text-white/40 text-7xl font-black">SONKO</div>
+            <div className="text-white/20 text-4xl font-black -mt-4">SOUND</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * ==========================================================
+ * ✅ Main Component
+ * ==========================================================
+ */
 const AllProductsView: React.FC<AllProductsViewProps> = ({
   products,
   onProductClick,
   onLoadMore,
   isLoading,
 }) => {
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  
   const safeProducts = useMemo(() => (products || []).filter(Boolean), [products]);
 
-  // Flash: first 12
-  const flashProducts = useMemo(() => safeProducts.slice(0, 12), [safeProducts]);
+  // Filter products by category if selected
+  const filteredProducts = useMemo(() => {
+    if (!selectedCategory || selectedCategory === 'all') return safeProducts;
+    return safeProducts.filter(p => 
+      (p as any).category_name?.toLowerCase().includes(selectedCategory.toLowerCase()) ||
+      p.category?.toLowerCase().includes(selectedCategory.toLowerCase())
+    );
+  }, [safeProducts, selectedCategory]);
 
-  // Brand: try to select more variety (spread across list)
-  const brandProducts = useMemo(() => {
-    if (safeProducts.length <= 24) return safeProducts.slice(0, 24);
+  // Featured products (first 8)
+  const featuredProducts = useMemo(() => safeProducts.slice(0, 8), [safeProducts]);
 
-    const picked: any[] = [];
-    const step = Math.max(1, Math.floor(safeProducts.length / 24));
-    for (let i = 0; i < safeProducts.length && picked.length < 24; i += step) {
-      picked.push(safeProducts[i]);
-    }
+  // Handle category selection
+  const handleCategorySelect = (category: string) => {
+    setSelectedCategory(category);
+    // Scroll to products section
+    setTimeout(() => {
+      document.getElementById('products-grid')?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  };
 
-    // Ensure unique IDs
-    const uniq: any[] = [];
-    const seen = new Set<string>();
-    for (const p of picked) {
-      const id = String((p as any)?.id ?? '');
-      if (!seen.has(id)) {
-        seen.add(id);
-        uniq.push(p);
-      }
-    }
-
-    return uniq.slice(0, 24);
-  }, [safeProducts]);
+  // Clear category filter
+  const handleClearFilter = () => {
+    setSelectedCategory(null);
+  };
 
   return (
-    <div className="animate-fadeIn min-h-screen pb-20 bg-[#F0F2F5]">
-      {/* =========================
-          ✅ FULL-WIDTH BARAKA SONKO HERO + DEALS (NO SIDE GAPS)
-          ========================= */}
-      <div className="bg-white border-b border-gray-100 w-full">
-        {/* Header */}
-        <div className="pt-6 pb-3 px-4">
-          <div className="text-[11px] font-black text-gray-400 uppercase tracking-widest">
-            Baraka Sonko Electronics
-          </div>
-          <div className="mt-1 text-2xl font-black text-gray-900 tracking-tight">Bidhaa Zote</div>
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1.5">
-            Infinite Collection • Randomized for You
-          </p>
-        </div>
+    <div className="min-h-screen bg-gray-50">
+      {/* Hero Banner */}
+      <HeroBanner onExploreClick={() => document.getElementById('products-grid')?.scrollIntoView({ behavior: 'smooth' })} />
 
-        {/* HERO (edge-to-edge) */}
-        <div
-          className="relative overflow-hidden w-full px-4 py-6"
-          style={{
-            background: `linear-gradient(135deg, ${COLORS.primary} 0%, #0A58CA 55%, #063A8F 100%)`,
-          }}
-        >
-          <div className="relative z-10">
-            <div className="text-[22px] font-black text-white leading-none">Ofa Mpaka</div>
-            <div className="mt-1 flex items-end gap-2">
-              <div className="text-[64px] font-black text-white leading-none">80%</div>
-              <div className="text-[28px] font-black text-white mb-2 leading-none">OFF</div>
+      {/* Stats Bar */}
+      <StatsBar totalProducts={safeProducts.length} />
+
+      {/* Category Strip */}
+      <CategoryStrip products={safeProducts} onSelect={handleCategorySelect} />
+
+      {/* Featured Slider */}
+      {!selectedCategory && <FeaturedSlider items={featuredProducts} onClick={onProductClick} />}
+
+      {/* Active Filter Indicator */}
+      {selectedCategory && selectedCategory !== 'all' && (
+        <div className="bg-white border-b border-gray-200">
+          <div className="max-w-[600px] mx-auto px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">Filtered by:</span>
+                <span className="px-3 py-1 bg-orange-100 text-orange-600 font-bold text-xs rounded-full">
+                  {selectedCategory}
+                </span>
+              </div>
+              <button
+                onClick={handleClearFilter}
+                className="text-xs text-gray-500 hover:text-orange-600 font-medium transition-colors"
+              >
+                Clear Filter
+              </button>
             </div>
-            <div className="mt-2 text-[12px] font-black text-white/80">
-              Bei Poa👍• Ndani Ya Baraka Sonko Electronics App
-            </div>
           </div>
-
-          <div className="absolute -top-16 -right-16 w-56 h-56 bg-white/10 rounded-full" />
-          <div className="absolute bottom-[-60px] left-[-60px] w-56 h-56 bg-white/10 rounded-full" />
         </div>
+      )}
 
-        {/* FLASH DEALS (slow rotation) */}
-        <div
-          className="w-full"
-          style={{
-            background: `linear-gradient(135deg, ${COLORS.primary} 0%, #0A58CA 100%)`,
-          }}
-        >
-          <RotatingRow
-            title="Flash Deals"
-            items={flashProducts}
-            onClick={onProductClick}
-            intervalMs={16000}
-          />
-        </div>
-
-        {/* BRAND DEALS (professional 3 different products, changes very slowly) */}
-        <div
-          className="w-full"
-          style={{
-            background: `linear-gradient(135deg, #0A58CA 0%, #063A8F 100%)`,
-          }}
-        >
-          <BrandDealsShowcase
-            items={brandProducts}
-            onClick={onProductClick}
-            intervalMs={26000} // VERY slow change
-          />
+      {/* Section Header */}
+      <div className="max-w-[600px] mx-auto px-4 pt-6 pb-3" id="products-grid">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-black text-gray-900">
+              {selectedCategory && selectedCategory !== 'all' ? selectedCategory : 'All Products'}
+            </h2>
+            <p className="text-xs text-gray-500 font-medium mt-1">
+              {filteredProducts.length} products available
+            </p>
+          </div>
+          {!selectedCategory && (
+            <div className="flex items-center gap-1">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              <span className="text-xs text-gray-500 font-medium">In Stock</span>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* =========================
-          ✅ GRID (kept as-is)
-          ========================= */}
+      {/* Product Grid */}
       <ProductGrid
-        products={products}
+        products={filteredProducts}
         onProductClick={onProductClick}
         onLoadMore={onLoadMore}
         hasMore={true}
         isLoading={isLoading}
       />
+
+      {/* Loading More Indicator */}
+      {isLoading && (
+        <div className="py-8 flex justify-center">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" />
+            <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce [animation-delay:0.2s]" />
+            <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce [animation-delay:0.4s]" />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
