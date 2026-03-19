@@ -44,6 +44,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Fetch categories from API with ?app=sound
   useEffect(() => {
     const fetchCategories = async () => {
       if (!isOpen || categories.length > 0) return;
@@ -52,7 +53,9 @@ const Sidebar: React.FC<SidebarProps> = ({
         setIsLoading(true);
         setError(null);
 
-        const response = await fetch('/api/categories');
+        const response = await fetch('/api/categories?app=sound', {
+          headers: { Accept: 'application/json' }
+        });
 
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -100,198 +103,361 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const renderMenu = () => (
-    <div className="animate-fadeIn">
-      {/* Category section */}
-      <div className="px-5 pt-5 pb-3">
-        <div className="rounded-2xl bg-gradient-to-r from-orange-500 to-orange-600 text-white p-4 shadow-sm">
-          <p className="text-[11px] uppercase tracking-[0.18em] font-bold text-orange-100">
-            Sonko Sound Menu
-          </p>
-          <h3 className="text-lg font-extrabold mt-1">Browse Categories</h3>
-          <p className="text-xs text-orange-100 mt-1">
-            Audio, electronics and featured collections
-          </p>
-        </div>
+    <div className="animate-fadeIn relative">
+      {/* Background color sheds for menu */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-32 -right-32 w-96 h-96 bg-gradient-to-br from-orange-200/30 to-amber-200/20 rounded-full blur-3xl" />
+        <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-gradient-to-tr from-amber-200/30 to-yellow-200/20 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-gradient-to-r from-orange-100/20 via-amber-100/20 to-orange-100/20 rounded-full blur-3xl" />
       </div>
 
-      <div className="px-5 py-3 text-[11px] font-black text-gray-400 uppercase tracking-[0.15em]">
-        Shop Categories
-      </div>
+      <div className="relative z-10">
+        {/* Category section with Alibaba-style header */}
+        <div className="px-5 pt-5 pb-3">
+          <div className="relative rounded-2xl overflow-hidden">
+            {/* Background sheds for header */}
+            <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-orange-600" />
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
+            <div className="absolute bottom-0 left-0 w-32 h-32 bg-amber-400/20 rounded-full blur-2xl" />
+            
+            <div className="relative p-4">
+              <p className="text-[11px] uppercase tracking-[0.18em] font-bold text-orange-100">
+                Sonko Sound Menu
+              </p>
+              <h3 className="text-lg font-extrabold text-white mt-1">Browse Categories</h3>
+              <p className="text-xs text-orange-100 mt-1">
+                Audio, electronics and featured collections
+              </p>
+              
+              {/* Decorative elements */}
+              <div className="absolute -bottom-2 -right-2 w-16 h-16 bg-white/5 rounded-full" />
+            </div>
+          </div>
+        </div>
 
-      {isLoading ? (
-        <div className="px-4 py-12 flex flex-col items-center justify-center">
-          <div className="w-8 h-8 border-[3px] border-orange-500 border-t-transparent rounded-full animate-spin mb-3"></div>
-          <p className="text-xs font-semibold text-gray-500">Loading categories...</p>
+        <div className="px-5 py-3 text-[11px] font-black text-gray-400 uppercase tracking-[0.15em] flex items-center gap-2">
+          <span className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
+          Shop Categories
+          <span className="text-[10px] font-medium text-orange-500 bg-orange-50 px-2 py-0.5 rounded-full ml-auto">
+            {categories.length}
+          </span>
         </div>
-      ) : error ? (
-        <div className="px-4 py-8 text-center">
-          <div className="w-10 h-10 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-3 text-red-500">
-            !
+
+        {isLoading ? (
+          <div className="px-4 py-12 flex flex-col items-center justify-center relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-orange-50/30 to-amber-50/30 rounded-full blur-3xl" />
+            <div className="relative w-12 h-12 border-[3px] border-orange-500 border-t-transparent rounded-full animate-spin mb-4" />
+            <p className="text-xs font-semibold text-gray-500">Loading categories...</p>
           </div>
-          <p className="text-xs font-bold text-gray-700 mb-2">Failed to load categories</p>
-          <p className="text-xs text-gray-400">{error}</p>
-          <button
-            onClick={() => {
-              setCategories([]);
-              setError(null);
-            }}
-            className="mt-4 px-4 py-2 text-xs font-bold bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors"
-          >
-            Retry
-          </button>
-        </div>
-      ) : categories.length === 0 ? (
-        <div className="px-4 py-8 text-center">
-          <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 text-gray-400">
-            ○
-          </div>
-          <p className="text-xs font-bold text-gray-700">No categories available</p>
-          <p className="text-xs text-gray-400 mt-1">Please check backend connection</p>
-        </div>
-      ) : (
-        <div className="px-4 grid grid-cols-3 gap-3 mb-8">
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => onCategorySelect(cat)}
-              className="flex flex-col items-center justify-center p-3 rounded-2xl bg-white border border-gray-100 shadow-sm active:scale-95 transition-all hover:border-orange-200 hover:bg-orange-50"
-            >
-              <div className="w-11 h-11 rounded-2xl bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-600 text-lg font-bold mb-2">
-                {cat.icon || getDefaultIcon(cat.name)}
+        ) : error ? (
+          <div className="px-4 py-8 text-center relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-red-50/30 to-orange-50/30 rounded-full blur-3xl" />
+            <div className="relative">
+              <div className="w-12 h-12 bg-gradient-to-br from-red-50 to-orange-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                <span className="text-red-500 text-xl">!</span>
               </div>
-              <span className="text-[10px] font-semibold text-gray-700 text-center leading-tight line-clamp-2">
-                {cat.name}
-              </span>
-            </button>
-          ))}
+              <p className="text-xs font-bold text-gray-700 mb-2">Failed to load categories</p>
+              <p className="text-xs text-gray-400">{error}</p>
+              <button
+                onClick={() => {
+                  setCategories([]);
+                  setError(null);
+                }}
+                className="mt-4 px-5 py-2.5 text-xs font-bold bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all shadow-lg"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        ) : categories.length === 0 ? (
+          <div className="px-4 py-8 text-center relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-gray-50/30 to-gray-100/30 rounded-full blur-3xl" />
+            <div className="relative">
+              <div className="w-12 h-12 bg-gradient-to-br from-gray-50 to-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 text-gray-400 text-xl">
+                ○
+              </div>
+              <p className="text-xs font-bold text-gray-700">No categories available</p>
+              <p className="text-xs text-gray-400 mt-1">Please check backend connection</p>
+            </div>
+          </div>
+        ) : (
+          <div className="px-4 grid grid-cols-3 gap-3 mb-8 relative">
+            {/* Background glow for grid */}
+            <div className="absolute inset-0 bg-gradient-to-br from-orange-100/20 to-amber-100/20 rounded-3xl blur-2xl" />
+            
+            {categories.map((cat, index) => (
+              <button
+                key={cat.id}
+                onClick={() => onCategorySelect(cat)}
+                className="relative flex flex-col items-center justify-center p-3 rounded-2xl bg-white/90 backdrop-blur-sm border border-orange-100/50 shadow-lg hover:shadow-xl active:scale-95 transition-all duration-300 group hover:border-orange-300 overflow-hidden"
+              >
+                {/* Background shed for each category card */}
+                <div className="absolute inset-0 bg-gradient-to-br from-orange-50/0 to-amber-50/0 group-hover:from-orange-50/60 group-hover:to-amber-50/60 transition-all duration-500" />
+                
+                {/* Top category indicator */}
+                {index < 3 && (
+                  <div className="absolute -top-1 -right-1">
+                    <div className="relative">
+                      <div className="w-4 h-4 bg-gradient-to-br from-orange-400 to-amber-500 rounded-full flex items-center justify-center shadow-lg">
+                        <span className="text-[8px] text-white font-black">#{index + 1}</span>
+                      </div>
+                      <div className="absolute inset-0 bg-orange-400 rounded-full blur-sm animate-pulse" />
+                    </div>
+                  </div>
+                )}
+
+                {/* Icon container */}
+                <div className="relative w-11 h-11 rounded-2xl bg-gradient-to-br from-orange-100 to-amber-100 border border-orange-200/50 flex items-center justify-center text-orange-600 text-lg font-bold mb-2 group-hover:scale-110 transition-transform duration-300">
+                  <span className="relative z-10">{cat.icon || getDefaultIcon(cat.name)}</span>
+                  
+                  {/* Icon glow on hover */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-orange-400/20 to-amber-400/20 rounded-2xl blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                </div>
+
+                {/* Category name */}
+                <span className="relative text-[10px] font-semibold text-gray-700 text-center leading-tight line-clamp-2 group-hover:text-orange-600 transition-colors z-10">
+                  {cat.name}
+                </span>
+
+                {/* Hover shine effect */}
+                <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-1000" />
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Info section */}
+        <div className="px-5 py-4 text-[11px] font-black text-gray-400 uppercase tracking-[0.15em] border-t border-orange-100/50 flex items-center gap-2">
+          <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
+          Information
         </div>
-      )}
 
-      {/* Info section */}
-      <div className="px-5 py-4 text-[11px] font-black text-gray-400 uppercase tracking-[0.15em] border-t border-gray-100">
-        Information
+        <ul className="px-4 space-y-3 pb-6 relative">
+          {/* Background sheds for info section */}
+          <div className="absolute inset-0 bg-gradient-to-t from-orange-50/30 to-transparent pointer-events-none" />
+          
+          <li
+            onClick={() => handlePageChange('about')}
+            className="relative flex items-center gap-4 p-4 rounded-2xl bg-white/90 backdrop-blur-sm border border-orange-100/50 shadow-lg cursor-pointer hover:shadow-xl transition-all duration-300 group overflow-hidden"
+          >
+            {/* Background shed */}
+            <div className="absolute inset-0 bg-gradient-to-r from-orange-50/0 to-amber-50/0 group-hover:from-orange-50/60 group-hover:to-amber-50/60 transition-all duration-500" />
+            
+            <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center text-orange-600 group-hover:scale-110 transition-transform duration-300">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
+              </svg>
+            </div>
+            <div className="relative">
+              <p className="text-sm font-bold text-gray-800 group-hover:text-orange-600 transition-colors">About Sonko Sound</p>
+              <p className="text-xs text-gray-400">Store profile and brand details</p>
+            </div>
+            
+            {/* Arrow indicator */}
+            <div className="absolute right-4 text-orange-400 opacity-0 group-hover:opacity-100 transition-opacity">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </li>
+
+          <li
+            onClick={() => handlePageChange('privacy')}
+            className="relative flex items-center gap-4 p-4 rounded-2xl bg-white/90 backdrop-blur-sm border border-orange-100/50 shadow-lg cursor-pointer hover:shadow-xl transition-all duration-300 group overflow-hidden"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-orange-50/0 to-amber-50/0 group-hover:from-orange-50/60 group-hover:to-amber-50/60 transition-all duration-500" />
+            
+            <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center text-orange-600 group-hover:scale-110 transition-transform duration-300">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+            </div>
+            <div className="relative">
+              <p className="text-sm font-bold text-gray-800 group-hover:text-orange-600 transition-colors">Privacy Policy</p>
+              <p className="text-xs text-gray-400">How customer information is handled</p>
+            </div>
+            
+            <div className="absolute right-4 text-orange-400 opacity-0 group-hover:opacity-100 transition-opacity">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </li>
+
+          <li
+            onClick={() => handlePageChange('terms')}
+            className="relative flex items-center gap-4 p-4 rounded-2xl bg-white/90 backdrop-blur-sm border border-orange-100/50 shadow-lg cursor-pointer hover:shadow-xl transition-all duration-300 group overflow-hidden"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-orange-50/0 to-amber-50/0 group-hover:from-orange-50/60 group-hover:to-amber-50/60 transition-all duration-500" />
+            
+            <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center text-orange-600 group-hover:scale-110 transition-transform duration-300">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+              </svg>
+            </div>
+            <div className="relative">
+              <p className="text-sm font-bold text-gray-800 group-hover:text-orange-600 transition-colors">Terms of Service</p>
+              <p className="text-xs text-gray-400">Rules for orders, payments and returns</p>
+            </div>
+            
+            <div className="absolute right-4 text-orange-400 opacity-0 group-hover:opacity-100 transition-opacity">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </li>
+        </ul>
       </div>
-
-      <ul className="px-4 space-y-3 pb-6">
-        <li
-          onClick={() => handlePageChange('about')}
-          className="flex items-center gap-4 p-4 rounded-2xl bg-white border border-gray-100 shadow-sm cursor-pointer hover:border-orange-200 hover:bg-orange-50/40 transition-all"
-        >
-          <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-orange-600">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="16" x2="12" y2="12" />
-              <line x1="12" y1="8" x2="12.01" y2="8" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-sm font-bold text-gray-800">About Sonko Sound</p>
-            <p className="text-xs text-gray-400">Store profile and brand details</p>
-          </div>
-        </li>
-
-        <li
-          onClick={() => handlePageChange('privacy')}
-          className="flex items-center gap-4 p-4 rounded-2xl bg-white border border-gray-100 shadow-sm cursor-pointer hover:border-orange-200 hover:bg-orange-50/40 transition-all"
-        >
-          <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-orange-600">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-sm font-bold text-gray-800">Privacy Policy</p>
-            <p className="text-xs text-gray-400">How customer information is handled</p>
-          </div>
-        </li>
-
-        <li
-          onClick={() => handlePageChange('terms')}
-          className="flex items-center gap-4 p-4 rounded-2xl bg-white border border-gray-100 shadow-sm cursor-pointer hover:border-orange-200 hover:bg-orange-50/40 transition-all"
-        >
-          <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-orange-600">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-              <line x1="16" y1="13" x2="8" y2="13" />
-              <line x1="16" y1="17" x2="8" y2="17" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-sm font-bold text-gray-800">Terms of Service</p>
-            <p className="text-xs text-gray-400">Rules for orders, payments and returns</p>
-          </div>
-        </li>
-      </ul>
     </div>
   );
 
   const renderAbout = () => (
-    <div className="animate-fadeIn p-6">
-      <h3 className="text-xl font-black text-gray-900 mb-4">About Sonko Sound</h3>
-      <div className="space-y-4 text-sm text-gray-600 leading-relaxed">
-        <p className="font-medium">
-          Welcome to <span className="text-orange-600 font-bold">Sonko Sound</span>. We focus on audio equipment,
-          electronics, and reliable products for customers in Tanzania and beyond.
-        </p>
-        <p>
-          Our goal is to provide quality devices with a modern shopping experience, professional presentation,
-          and trusted service.
-        </p>
-        <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-orange-500 mb-1">
-            Brand Focus
+    <div className="relative animate-fadeIn p-6 min-h-full">
+      {/* Background sheds for about page */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-32 -right-32 w-96 h-96 bg-gradient-to-br from-orange-200/30 to-amber-200/20 rounded-full blur-3xl" />
+        <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-gradient-to-tr from-amber-200/30 to-yellow-200/20 rounded-full blur-3xl" />
+      </div>
+
+      <div className="relative z-10">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-1 h-8 bg-gradient-to-b from-orange-400 to-amber-500 rounded-full" />
+          <h3 className="text-xl font-black text-gray-900">About Sonko Sound</h3>
+        </div>
+        
+        <div className="space-y-4 text-sm text-gray-600 leading-relaxed">
+          <p className="font-medium bg-white/60 backdrop-blur-sm p-4 rounded-2xl border border-orange-100/50">
+            Welcome to <span className="text-orange-600 font-bold">Sonko Sound</span>. We focus on audio equipment,
+            electronics, and reliable products for customers in Tanzania and beyond.
           </p>
-          <p className="text-sm font-semibold text-gray-800">
-            Sound systems, electronics, accessories and featured collections
+          
+          <p className="bg-white/60 backdrop-blur-sm p-4 rounded-2xl border border-orange-100/50">
+            Our goal is to provide quality devices with a modern shopping experience, professional presentation,
+            and trusted service.
           </p>
+          
+          <div className="relative bg-gradient-to-br from-orange-500 to-amber-500 rounded-2xl p-5 overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
+            <div className="absolute bottom-0 left-0 w-32 h-32 bg-amber-400/20 rounded-full blur-2xl" />
+            
+            <div className="relative">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-orange-100 mb-2">
+                Brand Focus
+              </p>
+              <p className="text-sm font-semibold text-white">
+                Sound systems, electronics, accessories and featured collections
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
 
   const renderPrivacy = () => (
-    <div className="animate-fadeIn p-6">
-      <h3 className="text-xl font-black text-gray-900 mb-4">Privacy Policy</h3>
-      <div className="space-y-4 text-sm text-gray-600 leading-relaxed">
-        <p>At Sonko Sound, we value your privacy and handle customer information with care.</p>
-        <div>
-          <h4 className="font-bold text-gray-800 mb-1">1. Data Collection</h4>
-          <p>We collect only the information needed for orders, delivery, and communication.</p>
+    <div className="relative animate-fadeIn p-6 min-h-full">
+      {/* Background sheds for privacy page */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-32 -right-32 w-96 h-96 bg-gradient-to-br from-blue-200/20 to-indigo-200/20 rounded-full blur-3xl" />
+        <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-gradient-to-tr from-purple-200/20 to-pink-200/20 rounded-full blur-3xl" />
+      </div>
+
+      <div className="relative z-10">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-1 h-8 bg-gradient-to-b from-blue-400 to-indigo-500 rounded-full" />
+          <h3 className="text-xl font-black text-gray-900">Privacy Policy</h3>
         </div>
-        <div>
-          <h4 className="font-bold text-gray-800 mb-1">2. Information Usage</h4>
-          <p>Your information is used to process purchases, provide updates, and improve customer experience.</p>
+        
+        <div className="space-y-4 text-sm text-gray-600 leading-relaxed">
+          <p className="bg-white/60 backdrop-blur-sm p-4 rounded-2xl border border-blue-100/50">
+            At Sonko Sound, we value your privacy and handle customer information with care.
+          </p>
+          
+          <div className="bg-white/60 backdrop-blur-sm p-4 rounded-2xl border border-blue-100/50">
+            <h4 className="font-bold text-gray-800 mb-2 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+              1. Data Collection
+            </h4>
+            <p>We collect only the information needed for orders, delivery, and communication.</p>
+          </div>
+          
+          <div className="bg-white/60 backdrop-blur-sm p-4 rounded-2xl border border-blue-100/50">
+            <h4 className="font-bold text-gray-800 mb-2 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
+              2. Information Usage
+            </h4>
+            <p>Your information is used to process purchases, provide updates, and improve customer experience.</p>
+          </div>
+          
+          <div className="bg-white/60 backdrop-blur-sm p-4 rounded-2xl border border-blue-100/50">
+            <h4 className="font-bold text-gray-800 mb-2 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 bg-purple-500 rounded-full" />
+              3. Data Protection
+            </h4>
+            <p>We apply reasonable security measures to protect personal and order-related information.</p>
+          </div>
+          
+          <p className="text-[10px] text-gray-400 italic pt-2">Last updated: May 2025</p>
         </div>
-        <div>
-          <h4 className="font-bold text-gray-800 mb-1">3. Data Protection</h4>
-          <p>We apply reasonable security measures to protect personal and order-related information.</p>
-        </div>
-        <p className="text-[10px] text-gray-400 italic pt-2">Last updated: May 2025</p>
       </div>
     </div>
   );
 
   const renderTerms = () => (
-    <div className="animate-fadeIn p-6">
-      <h3 className="text-xl font-black text-gray-900 mb-4">Terms of Service</h3>
-      <div className="space-y-4 text-sm text-gray-600 leading-relaxed">
-        <p>By using Sonko Sound, you agree to the terms and conditions below.</p>
-        <div>
-          <h4 className="font-bold text-gray-800 mb-1">1. Ordering</h4>
-          <p>All orders are subject to product availability and confirmation.</p>
+    <div className="relative animate-fadeIn p-6 min-h-full">
+      {/* Background sheds for terms page */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-32 -right-32 w-96 h-96 bg-gradient-to-br from-amber-200/20 to-orange-200/20 rounded-full blur-3xl" />
+        <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-gradient-to-tr from-yellow-200/20 to-amber-200/20 rounded-full blur-3xl" />
+      </div>
+
+      <div className="relative z-10">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-1 h-8 bg-gradient-to-b from-amber-400 to-orange-500 rounded-full" />
+          <h3 className="text-xl font-black text-gray-900">Terms of Service</h3>
         </div>
-        <div>
-          <h4 className="font-bold text-gray-800 mb-1">2. Payment</h4>
-          <p>Orders are processed after payment is confirmed through the available payment methods.</p>
-        </div>
-        <div>
-          <h4 className="font-bold text-gray-800 mb-1">3. Delivery</h4>
-          <p>Delivery timelines are estimates and may vary depending on location and logistics.</p>
-        </div>
-        <div>
-          <h4 className="font-bold text-gray-800 mb-1">4. Returns</h4>
-          <p>Customers should report defective or incorrect items within the allowed return period.</p>
+        
+        <div className="space-y-4 text-sm text-gray-600 leading-relaxed">
+          <p className="bg-white/60 backdrop-blur-sm p-4 rounded-2xl border border-amber-100/50">
+            By using Sonko Sound, you agree to the terms and conditions below.
+          </p>
+          
+          <div className="bg-white/60 backdrop-blur-sm p-4 rounded-2xl border border-amber-100/50">
+            <h4 className="font-bold text-gray-800 mb-2 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
+              1. Ordering
+            </h4>
+            <p>All orders are subject to product availability and confirmation.</p>
+          </div>
+          
+          <div className="bg-white/60 backdrop-blur-sm p-4 rounded-2xl border border-amber-100/50">
+            <h4 className="font-bold text-gray-800 mb-2 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
+              2. Payment
+            </h4>
+            <p>Orders are processed after payment is confirmed through the available payment methods.</p>
+          </div>
+          
+          <div className="bg-white/60 backdrop-blur-sm p-4 rounded-2xl border border-amber-100/50">
+            <h4 className="font-bold text-gray-800 mb-2 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full" />
+              3. Delivery
+            </h4>
+            <p>Delivery timelines are estimates and may vary depending on location and logistics.</p>
+          </div>
+          
+          <div className="bg-white/60 backdrop-blur-sm p-4 rounded-2xl border border-amber-100/50">
+            <h4 className="font-bold text-gray-800 mb-2 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
+              4. Returns
+            </h4>
+            <p>Customers should report defective or incorrect items within the allowed return period.</p>
+          </div>
         </div>
       </div>
     </div>
@@ -299,24 +465,33 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <>
+      {/* Backdrop */}
       <div
-        className={`fixed inset-0 bg-black/45 z-[60] transition-opacity duration-300 ${
+        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] transition-opacity duration-300 ${
           isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={closeSidebar}
       />
 
+      {/* Sidebar */}
       <div
-        className={`fixed top-0 left-0 h-full w-[310px] bg-[#fffaf5] z-[70] transform transition-transform duration-300 ease-in-out flex flex-col shadow-2xl ${
+        className={`fixed top-0 left-0 h-full w-[330px] bg-gradient-to-br from-white to-orange-50/30 z-[70] transform transition-transform duration-300 ease-out shadow-2xl flex flex-col ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
+        {/* Background sheds for entire sidebar */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-gradient-to-br from-orange-200/20 to-amber-200/20 rounded-full blur-3xl" />
+          <div className="absolute -bottom-40 -left-40 w-[500px] h-[500px] bg-gradient-to-tr from-amber-200/20 to-yellow-200/20 rounded-full blur-3xl" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-gradient-to-r from-orange-100/10 via-amber-100/10 to-orange-100/10 rounded-full blur-3xl" />
+        </div>
+
         {/* Sidebar header */}
-        <div className="relative px-5 pt-5 pb-4 bg-white border-b border-orange-100">
+        <div className="relative px-5 pt-5 pb-4 bg-white/80 backdrop-blur-sm border-b border-orange-100/50 z-10">
           {currentPage !== 'menu' && (
             <button
               onClick={() => handlePageChange('menu')}
-              className="mb-4 w-9 h-9 flex items-center justify-center rounded-full border border-orange-100 bg-orange-50 text-orange-600 active:scale-95 transition-transform"
+              className="mb-4 w-9 h-9 flex items-center justify-center rounded-full bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200/50 text-orange-600 active:scale-95 transition-transform shadow-lg hover:shadow-xl"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
                 <path d="M15 18l-6-6 6-6" />
@@ -327,8 +502,10 @@ const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center text-white shadow-sm">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1">
+                <div className="relative w-11 h-11 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center text-white shadow-lg">
+                  {/* Logo glow */}
+                  <div className="absolute inset-0 bg-orange-500 rounded-2xl blur-md opacity-50" />
+                  <svg className="relative z-10" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1">
                     <path d="M5 9v6" />
                     <path d="M9 7v10" />
                     <path d="M13 10v4" />
@@ -337,10 +514,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </div>
 
                 <div>
-                  <div
-                    className="text-xl font-black tracking-tight leading-none"
-                    style={{ color: COLORS.primary }}
-                  >
+                  <div className="text-xl font-black tracking-tight leading-none bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
                     {currentPage === 'menu' ? 'SONKO SOUND' : 'SONKO INFO'}
                   </div>
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mt-1 block">
@@ -352,7 +526,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               onClick={closeSidebar}
-              className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-50 border border-gray-100 text-gray-400 text-2xl font-light active:scale-95 transition-transform"
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-white border border-orange-100/50 text-gray-400 text-2xl font-light active:scale-95 transition-transform shadow-lg hover:shadow-xl hover:text-orange-500"
             >
               &times;
             </button>
@@ -360,7 +534,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Scrollable content */}
-        <div className="flex-grow overflow-y-auto no-scrollbar bg-[#fffaf5]">
+        <div className="relative flex-grow overflow-y-auto no-scrollbar z-10">
           {currentPage === 'menu' && renderMenu()}
           {currentPage === 'about' && renderAbout()}
           {currentPage === 'privacy' && renderPrivacy()}
@@ -368,9 +542,9 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-5 border-t border-orange-100 bg-white">
+        <div className="relative px-6 py-5 border-t border-orange-100/50 bg-white/80 backdrop-blur-sm z-10">
           <div className="text-center">
-            <p className="text-[11px] font-extrabold tracking-[0.18em] uppercase text-gray-700">
+            <p className="text-[11px] font-extrabold tracking-[0.18em] uppercase bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
               Sonko Sound
             </p>
             <p className="text-[10px] text-gray-400 mt-2 uppercase tracking-wider font-semibold">
