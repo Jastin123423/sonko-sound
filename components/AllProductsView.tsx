@@ -322,10 +322,10 @@ const HeroBanner: React.FC<{
               </span>
             </div>
             <h1 className="text-3xl font-black text-white mb-2 leading-tight">
-              Baraka Sonko<br />Electronics
+              Sonko<br />Sound 
             </h1>
             <p className="text-orange-100 text-sm mb-4 max-w-xs">
-              Premium audio gear, electronics, and accessories at the best prices in town.
+             Pata Bidhaa Premium kama Bidhaa za Muziki na accessories Nyingine Ndani ya Sonko Sound.
             </p>
             <button
               onClick={onExploreClick}
