@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ICONS } from '../constants';
 import { Product } from '../types';
+import { useNavigate } from 'react-router-dom';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -29,6 +30,7 @@ const Header: React.FC<HeaderProps> = ({
   initialValue = '',
   onProductSelect
 }) => {
+  const navigate = useNavigate();
   const [query, setQuery] = useState(initialValue);
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -54,6 +56,15 @@ const Header: React.FC<HeaderProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Handle tab navigation
+  useEffect(() => {
+    if (activeInsideTab === 'baraka') {
+      navigate('/barakasonko');
+    } else {
+      navigate('/');
+    }
+  }, [activeInsideTab, navigate]);
 
   const isMicrophone = (product: SearchSuggestion): boolean => {
     const title = (product.title || product.name || '').toLowerCase();
