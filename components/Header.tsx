@@ -8,6 +8,7 @@ interface HeaderProps {
   onSearch: (query: string) => void;
   initialValue?: string;
   onProductSelect?: (product: Product) => void;
+  onBarakasonkoClick?: () => void; // Add this prop
 }
 
 interface SearchSuggestion {
@@ -28,7 +29,8 @@ const Header: React.FC<HeaderProps> = ({
   onMenuClick,
   onSearch,
   initialValue = '',
-  onProductSelect
+  onProductSelect,
+  onBarakasonkoClick // Add this prop
 }) => {
   const navigate = useNavigate();
   const [query, setQuery] = useState(initialValue);
@@ -60,11 +62,17 @@ const Header: React.FC<HeaderProps> = ({
   // Handle tab navigation
   useEffect(() => {
     if (activeInsideTab === 'baraka') {
-      navigate('/barakasonko');
+      // Call the onBarakasonkoClick prop when baraka tab is active
+      if (onBarakasonkoClick) {
+        onBarakasonkoClick();
+      } else {
+        // Fallback to navigate directly if prop not provided
+        navigate('/barakasonko');
+      }
     } else {
       navigate('/');
     }
-  }, [activeInsideTab, navigate]);
+  }, [activeInsideTab, navigate, onBarakasonkoClick]);
 
   const isMicrophone = (product: SearchSuggestion): boolean => {
     const title = (product.title || product.name || '').toLowerCase();
@@ -204,6 +212,21 @@ const Header: React.FC<HeaderProps> = ({
       badge: 'Store & Deals',
     },
   ] as const;
+
+  // Handle tab click manually to ensure navigation works
+  const handleInsideTabClick = (tabId: 'sonko' | 'baraka') => {
+    setActiveInsideTab(tabId);
+    
+    if (tabId === 'baraka') {
+      if (onBarakasonkoClick) {
+        onBarakasonkoClick();
+      } else {
+        navigate('/barakasonko');
+      }
+    } else {
+      navigate('/');
+    }
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full bg-white shadow-sm border-b border-gray-100">
@@ -454,7 +477,7 @@ const Header: React.FC<HeaderProps> = ({
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveInsideTab(tab.id)}
+                onClick={() => handleInsideTabClick(tab.id)}
                 className={`relative min-w-max rounded-2xl px-4 py-2.5 text-left transition-all border ${
                   isActive
                     ? 'bg-white border-orange-200 shadow-sm'
