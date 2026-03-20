@@ -733,6 +733,7 @@ const AppContent: React.FC = () => {
         setFetchError(null);
         setRouteReady(false);
 
+        // Try to load from cache first
         const cachedCategories = loadFromCache<Category[]>(CATEGORIES_CACHE_KEY);
         const cachedProducts = loadFromCache<Product[]>(PRODUCTS_CACHE_KEY);
 
@@ -751,9 +752,25 @@ const AppContent: React.FC = () => {
           setCommentCounts(initialCounts);
           setViewCounts(initialViewCounts);
           setIsLoading(false);
+          setRouteReady(true); // Mark route as ready immediately
+          
+          // Fetch fresh data in background
+          fetchFreshData();
           return;
         }
 
+        // No cache, fetch fresh data
+        await fetchFreshData();
+      } catch (error: any) {
+        console.error('❌ App: Failed to initialize app', error);
+        setFetchError(error.message || 'Network or server error');
+        setIsLoading(false);
+        setRouteReady(true); // Still mark route as ready to show error UI
+      }
+    };
+
+    const fetchFreshData = async () => {
+      try {
         const [prodRes, catRes] = await Promise.all([
           fetch('/api/products?app=sound', {
             headers: { Accept: 'application/json' }
@@ -811,10 +828,11 @@ const AppContent: React.FC = () => {
           );
         }
       } catch (error: any) {
-        console.error('❌ App: Failed to initialize app', error);
-        setFetchError(error.message || 'Network or server error');
+        console.error('❌ Failed to fetch fresh data:', error);
+        setFetchError(error.message || 'Network error while fetching fresh data');
       } finally {
         setIsLoading(false);
+        setRouteReady(true);
       }
     };
 
@@ -1374,69 +1392,6 @@ const AppContent: React.FC = () => {
             : view === 'category-results'
               ? 'categories'
               : 'home';
-
-  if ((isLoading || !routeReady) && view !== 'category-results') {
-    return (
-      <div className="fixed inset-0 bg-gradient-to-br from-[#f7f7f7] via-white to-[#f3f3f3] flex items-center justify-center px-6 z-[999]">
-        <div className="relative flex flex-col items-center">
-          <div className="absolute w-40 h-40 rounded-full bg-[#f26b2e]/10 blur-3xl animate-pulse" />
-          <div className="relative flex flex-col items-center">
-            <div className="relative w-24 h-24 flex items-center justify-center">
-              <div className="absolute inset-0 rounded-full border-[6px] border-[#f26b2e] opacity-95 animate-[spin_6s_linear_infinite]" />
-              <div className="relative w-16 h-16 rounded-full bg-white shadow-[0_8px_30px_rgba(242,107,46,0.18)] border border-[#ececec] flex items-center justify-center">
-                <svg
-                  viewBox="0 0 64 64"
-                  className="w-9 h-9"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <rect x="16" y="22" width="14" height="20" rx="3" fill="#f26b2e" />
-                  <path d="M30 27L40 20V44L30 37V27Z" fill="#f26b2e" />
-                  <path
-                    d="M44 25C47 27.5 49 31 49 32C49 33 47 36.5 44 39"
-                    stroke="#f26b2e"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M48 20C52 24 55 29 55 32C55 35 52 40 48 44"
-                    stroke="#cfcfcf"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
-
-              <div className="absolute -right-10 flex items-end gap-1 h-10">
-                <span className="w-1.5 rounded-full bg-[#f26b2e] animate-[soundBar_0.9s_ease-in-out_infinite]" />
-                <span className="w-1.5 rounded-full bg-[#f59a6a] animate-[soundBar_0.9s_ease-in-out_infinite_0.15s]" />
-                <span className="w-1.5 rounded-full bg-[#d9d9d9] animate-[soundBar_0.9s_ease-in-out_infinite_0.3s]" />
-              </div>
-            </div>
-
-            <div className="mt-6 text-center">
-              <h1 className="text-[34px] leading-none font-black tracking-[0.18em] text-[#f26b2e] drop-shadow-sm">
-                SONKO
-              </h1>
-              <p className="mt-2 text-[13px] font-extrabold tracking-[0.45em] text-[#cfcfcf]">
-                SOUND
-              </p>
-              <div className="mt-4 flex items-center justify-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-[#f26b2e] animate-bounce" />
-                <span className="w-2 h-2 rounded-full bg-[#f59a6a] animate-bounce [animation-delay:120ms]" />
-                <span className="w-2 h-2 rounded-full bg-[#d7d7d7] animate-bounce [animation-delay:240ms]" />
-              </div>
-              <p className="mt-4 text-xs font-semibold tracking-[0.18em] uppercase text-[#9c9c9c]">
-                Loading store data...
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   if (fetchError) {
     return (
