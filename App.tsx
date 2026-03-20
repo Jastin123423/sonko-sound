@@ -260,7 +260,7 @@ const VideoPlayer: React.FC<{
   const handlePlayPause = () => {
     if (videoRef.current) {
       if (videoRef.current.paused) {
-        videoRef.current.play().then(() => setIsPlaying(true));
+        videoRef.current.play().then(() => setIsPlaying(true)).catch(console.error);
       } else {
         videoRef.current.pause();
         setIsPlaying(false);
@@ -344,7 +344,6 @@ const Banner: React.FC<{
   alt = '',
   containerClass = '',
   onClick,
-  isGif = true
 }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -479,8 +478,15 @@ const normalizeCategory = (cat: any): Category => {
     id: String(cat.id || cat._id || `cat_${Date.now()}_${Math.random()}`),
     name: String(cat.name || cat.category_name || cat.title || 'Unnamed Category'),
     icon: backendIcon || getDefaultCategoryIcon(cat.name || ''),
+    appFlag: Number(
+      cat?.app_flag ??
+      cat?.appFlag ??
+      cat?.app ??
+      cat?.is_sonko_sound ??
+      1
+    ),
     ...cat
-  };
+  } as Category;
 };
 
 // Comments API Service
@@ -707,7 +713,7 @@ const AppContent: React.FC = () => {
       const found = categoriesList.find(c => String(c.id) === String(categoryId));
       if (found) {
         categoryName = found.name;
-        categoryIcon = categoryIcon || found.icon || '';
+        categoryIcon = found.icon || '';
       }
     }
 
@@ -735,6 +741,16 @@ const AppContent: React.FC = () => {
       category_id: categoryId || undefined,
       category_name: categoryName,
       categoryIcon: getProductCategoryIcon(),
+
+      // 1 = Sonko Sound, 0 = Baraka Sonko
+      appFlag: Number(
+        p?.app_flag ??
+        p?.appFlag ??
+        p?.app ??
+        p?.is_sonko_sound ??
+        1
+      ),
+
       image: p?.image || p?.image_url || (Array.isArray(p?.images) ? p.images[0] : '') || '',
       images: Array.isArray(p?.images)
         ? p.images
@@ -749,7 +765,7 @@ const AppContent: React.FC = () => {
           ? p.description_images
           : [],
       videoUrl: String(p?.videoUrl ?? p?.video_url ?? ''),
-    } as any;
+    } as Product & { appFlag: number };
   };
 
   useEffect(() => {
@@ -779,7 +795,7 @@ const AppContent: React.FC = () => {
           setIsLoading(false);
           setRouteReady(true);
 
-          fetchFreshData();
+          void fetchFreshData();
           return;
         }
 
@@ -795,10 +811,10 @@ const AppContent: React.FC = () => {
     const fetchFreshData = async () => {
       try {
         const [prodRes, catRes] = await Promise.all([
-          fetch('/api/products?app=sound', {
+          fetch('/api/products', {
             headers: { Accept: 'application/json' }
           }),
-          fetch('/api/categories?app=sound', {
+          fetch('/api/categories', {
             headers: { Accept: 'application/json' }
           }),
         ]);
@@ -859,7 +875,7 @@ const AppContent: React.FC = () => {
       }
     };
 
-    initApp();
+    void initApp();
   }, []);
 
   const buildCategoryProductMap = useCallback(() => {
@@ -982,9 +998,17 @@ const AppContent: React.FC = () => {
   const handleCategorySelect = (category: Category) => {
     setIsSidebarOpen(false);
 
+    const categoryFlag = Number((category as any).appFlag ?? 1);
+
     if (category.id === '14' || category.name === 'Bidhaa Zote') {
       setView('all-products');
-      goToScopedPath('/all-products');
+
+      if (categoryFlag === 0) {
+        navigate('/all-products');
+      } else {
+        navigate('/sonkosound/all-products');
+      }
+
       window.scrollTo(0, 0);
       return;
     }
@@ -993,7 +1017,13 @@ const AppContent: React.FC = () => {
     setCategoryProducts(productsForCategory);
     setSelectedCategory(category);
     setView('category-results');
-    goToScopedPath(`/category/${category.id}`);
+
+    if (categoryFlag === 0) {
+      navigate(`/category/${category.id}`);
+    } else {
+      navigate(`/sonkosound/category/${category.id}`);
+    }
+
     window.scrollTo(0, 0);
   };
 
@@ -1146,11 +1176,18 @@ const AppContent: React.FC = () => {
     setSelectedProduct(product);
     setView('product-detail');
     setRouteReady(true);
-    goToScopedPath(`/product/${product.id}`);
 
-    fetchCommentsForProduct(product.id);
+    const appFlag = Number((product as any).appFlag ?? 1);
 
-    (async () => {
+    if (appFlag === 0) {
+      navigate(`/product/${product.id}`);
+    } else {
+      navigate(`/sonkosound/product/${product.id}`);
+    }
+
+    void fetchCommentsForProduct(product.id);
+
+    void (async () => {
       const viewerKey = getOrCreateUserId();
       const newCount = await ViewsService.recordView(product.id, viewerKey);
       setViewCounts(prev => ({ ...prev, [product.id]: newCount }));
@@ -1159,13 +1196,13 @@ const AppContent: React.FC = () => {
 
   const fetchSelectedProductComments = useCallback(() => {
     if (!selectedProduct?.id) return;
-    fetchCommentsForProduct(selectedProduct.id);
+    void fetchCommentsForProduct(selectedProduct.id);
   }, [selectedProduct?.id]);
 
   const addSelectedProductComment = useCallback((content: string) => {
     if (!selectedProduct?.id) return Promise.resolve(null);
     return handleAddComment(selectedProduct.id, content);
-  }, [selectedProduct?.id]);
+  }, [selectedProduct?.id, user]);
 
   const likeSelectedProductComment = useCallback((commentId: string) => {
     if (!selectedProduct?.id) return Promise.resolve(false);
@@ -1222,7 +1259,7 @@ const AppContent: React.FC = () => {
         return true;
       }
 
-      const prodRes = await fetch('/api/products?app=sound');
+      const prodRes = await fetch('/api/products');
       const prodData = await prodRes.json().catch(() => null);
 
       if (prodData?.success) {
@@ -1374,9 +1411,9 @@ const AppContent: React.FC = () => {
         setView('product-detail');
         setRouteReady(true);
 
-        fetchCommentsForProduct(product.id);
+        void fetchCommentsForProduct(product.id);
 
-        (async () => {
+        void (async () => {
           const viewerKey = getOrCreateUserId();
           const newCount = await ViewsService.recordView(product.id, viewerKey);
           setViewCounts(prev => ({ ...prev, [product.id]: newCount }));
