@@ -76,7 +76,7 @@ const usePreloadVideo = (videoUrl: string) => {
 };
 
 /** -----------------------------
- * ✅ Large Watermarked Image with Baraka Sonko branding (FOR MAIN IMAGE ONLY)
+ * ✅ Large Watermarked Image with Sonko Sound branding
  * ------------------------------*/
 const LargeWatermarkedImage: React.FC<{
   src: string;
@@ -84,8 +84,9 @@ const LargeWatermarkedImage: React.FC<{
   containerClass?: string;
   productId?: string;
   priority?: boolean;
-}> = ({ src, alt = '', containerClass = '', productId = '', priority = false }) => {
-  const logoUrl = 'https://media.barakasonko.store/download__82_-removebg-preview.png';
+  showWatermark?: boolean;
+}> = ({ src, alt = '', containerClass = '', productId = '', priority = false, showWatermark = true }) => {
+  const logoUrl = 'https://media.barakasonko.store/Screenshot_2026-03-18_221011-removebg-preview.png';
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
@@ -150,7 +151,7 @@ const LargeWatermarkedImage: React.FC<{
         <div className="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse" />
       )}
 
-      {isLoaded && (
+      {isLoaded && showWatermark && (
         <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
           <div className="relative w-40 h-40 opacity-80">
             <img
@@ -191,44 +192,9 @@ const LargeWatermarkedImage: React.FC<{
               border: '2px solid rgba(255,255,255,0.3)',
             }}
           >
-            ©BarakaSonko
+            ©SonkoSound
           </div>
         </div>
-      )}
-    </div>
-  );
-};
-
-/** -----------------------------
- * ✅ Small Thumbnail Image (NO WATERMARK)
- * ------------------------------*/
-const ThumbnailImage: React.FC<{
-  src: string;
-  alt?: string;
-  containerClass?: string;
-}> = ({ src, alt = '', containerClass = '' }) => {
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  return (
-    <div className={`relative overflow-hidden ${containerClass}`}>
-      <img
-        src={toUrl(src)}
-        alt={alt}
-        className="w-full h-full object-cover transition-opacity duration-200"
-        draggable="false"
-        loading="lazy"
-        decoding="async"
-        style={{
-          opacity: isLoaded ? 1 : 0.5,
-        }}
-        onLoad={() => setIsLoaded(true)}
-        onError={(e) => {
-          (e.target as HTMLImageElement).style.opacity = '1';
-          setIsLoaded(true);
-        }}
-      />
-      {!isLoaded && (
-        <div className="absolute inset-0 bg-gray-200 animate-pulse" />
       )}
     </div>
   );
@@ -317,7 +283,7 @@ const SharePanel: React.FC<{
 }> = ({ isOpen, onClose, productTitle, productLink, shareImageUrl }) => {
   const [copied, setCopied] = useState(false);
 
-  const shareText = `Check out "${productTitle}" on BARAKA SONKO ELECTRONICS APP! 🛒\n${productLink}\n\n#barakasonko #electronics #tanzania`;
+  const shareText = `Check out "${productTitle}" on SONKO SOUND APP! 🛒\n${productLink}\n\n#sonkosound #electronics #tanzania`;
 
   const handleShare = (platform: 'whatsapp' | 'facebook' | 'instagram' | 'tiktok') => {
     switch (platform) {
@@ -327,7 +293,7 @@ const SharePanel: React.FC<{
       case 'facebook':
         window.open(
           `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(productLink)}&quote=${encodeURIComponent(
-            `Check out "${productTitle}" on BARAKA SONKO!`
+            `Check out "${productTitle}" on SONKO SOUND!`
           )}`,
           '_blank',
           'width=600,height=400'
@@ -453,7 +419,7 @@ const SharePanel: React.FC<{
           </div>
 
           <p className="text-xs text-gray-500 text-center">
-            Sharing helps others find great products from BARAKA SONKO ELECTRONICS!
+            Sharing helps others find great products from SONKO SOUND!
           </p>
         </div>
 
@@ -583,7 +549,7 @@ const ProductDetailView: React.FC<ProductDetailViewProps> = ({
       const origin = window.location.origin;
       return `${origin}/product/${(product as any).id}`;
     } catch {
-      return 'https://barakasonko.store';
+      return 'https://sonkosound.store';
     }
   }, [(product as any).id]);
 
@@ -681,7 +647,7 @@ const ProductDetailView: React.FC<ProductDetailViewProps> = ({
 
   const productDescription =
     toUrl((product as any).description) ||
-    `Welcome to BARAKA SONKO ELECTRONICS. Our ${(product as any).title} is selected for its superior quality and durability. Perfect for professional or home use.`;
+    `Welcome to SONKO SOUND. Our ${(product as any).title} is selected for its superior quality and durability. Perfect for professional or home use.`;
 
   return (
     <div className="fixed inset-0 bg-white z-[100] flex flex-col animate-fadeIn overflow-hidden">
@@ -692,7 +658,7 @@ const ProductDetailView: React.FC<ProductDetailViewProps> = ({
             <path d="M15 18l-6-6 6-6" />
           </svg>
         </button>
-        <div className="text-sm font-black text-white truncate px-4">BARAKA SONKO</div>
+        <div className="text-sm font-black text-white truncate px-4">SONKO SOUND</div>
         <div className="flex items-center space-x-2">
           <button onClick={handleShare} className="p-2 text-white hover:text-white/80 transition-colors" aria-label="Share">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -730,6 +696,7 @@ const ProductDetailView: React.FC<ProductDetailViewProps> = ({
                   containerClass="w-full h-full"
                   productId={String((product as any).id)}
                   priority={idx === 0 || idx === activeImage}
+                  showWatermark={true}
                 />
               </div>
             ))}
@@ -762,11 +729,13 @@ const ProductDetailView: React.FC<ProductDetailViewProps> = ({
                         : 'border-gray-200'
                     }`}
                   >
-                    {/* Use ThumbnailImage WITHOUT watermark */}
-                    <ThumbnailImage
+                    <LargeWatermarkedImage
                       src={img}
                       alt={`Thumbnail ${idx + 1}`}
                       containerClass="w-full h-full"
+                      productId={(product as any).id}
+                      priority={false}
+                      showWatermark={false}
                     />
 
                     {thumbPrice > 0 && (
@@ -880,6 +849,7 @@ const ProductDetailView: React.FC<ProductDetailViewProps> = ({
                     containerClass="w-full h-auto"
                     productId={`${(product as any).id}-desc-${idx}`}
                     priority={idx < 2}
+                    showWatermark={true}
                   />
                 </div>
               ))}
@@ -916,12 +886,13 @@ const ProductDetailView: React.FC<ProductDetailViewProps> = ({
                       onClick={() => onProductClick(relatedProduct)}
                     >
                       <div className="aspect-square rounded-lg overflow-hidden mb-2 bg-gray-50 relative">
-                        <WatermarkedImage
+                        <LargeWatermarkedImage
                           src={(relatedProduct as any).image}
                           alt={(relatedProduct as any).title}
                           containerClass="w-full h-full"
                           productId={(relatedProduct as any).id}
-                          isProduct={true}
+                          priority={false}
+                          showWatermark={true}
                         />
                       </div>
 
@@ -944,9 +915,9 @@ const ProductDetailView: React.FC<ProductDetailViewProps> = ({
             </div>
           ) : null}
 
-          {/* Baraka Sonko watermark footer */}
+          {/* Sonko Sound watermark footer */}
           <div className="mt-8 text-center pb-4">
-            <span className="text-xs text-gray-400">©BarakaSonko - Product images protected</span>
+            <span className="text-xs text-gray-400">©SonkoSound - Product images protected</span>
           </div>
         </div>
       </div>
