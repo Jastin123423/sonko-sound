@@ -1,3 +1,4 @@
+// App.tsx
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useParams, Navigate, useLocation } from 'react-router-dom';
 import Header from './components/Header';
@@ -12,7 +13,6 @@ import AuthView from './components/AuthView';
 import ProductDetailView from './components/ProductDetailView';
 import CategoriesView from './components/CategoriesView';
 import AllProductsView from './components/AllProductsView';
-import Barakasonko from './components/Barakasonko';
 import { Product, User, Category, Comment } from './types';
 
 // Cache helpers
@@ -69,7 +69,6 @@ const getInitialViewFromPath = (pathname: string) => {
   if (pathname === '/categories') return 'categories';
   if (pathname === '/all-products') return 'all-products';
   if (pathname === '/admin') return 'admin';
-  if (pathname === '/barakasonko') return 'barakasonko';
   return 'home';
 };
 
@@ -618,7 +617,6 @@ const AppContent: React.FC = () => {
     | 'categories'
     | 'search-results'
     | 'all-products'
-    | 'barakasonko'
   >(() => getInitialViewFromPath(window.location.pathname) as any);
 
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -1276,9 +1274,7 @@ const AppContent: React.FC = () => {
   };
 
   const handleBarakasonkoClick = () => {
-    setView('barakasonko');
-    setRouteReady(true);
-    navigate('/barakasonko');
+    window.location.href = 'https://barakasonko.store';
   };
 
   const handleSonkoClick = () => {
@@ -1313,12 +1309,6 @@ const AppContent: React.FC = () => {
 
     if (location.pathname.startsWith('/admin')) {
       setView('admin');
-      setRouteReady(true);
-      return;
-    }
-
-    if (location.pathname.startsWith('/barakasonko')) {
-      setView('barakasonko');
       setRouteReady(true);
       return;
     }
@@ -1383,11 +1373,9 @@ const AppContent: React.FC = () => {
             ? 'search-results'
             : view === 'category-results'
               ? 'categories'
-              : view === 'barakasonko'
-                ? 'home'
-                : 'home';
+              : 'home';
 
-  if ((isLoading || !routeReady) && view !== 'category-results' && view !== 'barakasonko') {
+  if ((isLoading || !routeReady) && view !== 'category-results') {
     return (
       <div className="fixed inset-0 bg-gradient-to-br from-[#f7f7f7] via-white to-[#f3f3f3] flex items-center justify-center px-6 z-[999]">
         <div className="relative flex flex-col items-center">
@@ -1522,13 +1510,7 @@ const AppContent: React.FC = () => {
       )}
 
       <main className="w-full max-w-[600px] mx-auto pb-24">
-        {view === 'barakasonko' ? (
-          <Barakasonko
-            products={products}
-            onProductClick={handleProductClick}
-            WatermarkedImage={WatermarkedImage}
-          />
-        ) : view === 'home' ? (
+        {view === 'home' ? (
           <>
             <QuickActions onActionSelect={() => {
               setView('all-products');
@@ -1697,7 +1679,6 @@ const App: React.FC = () => {
         <Route path="/categories" element={<AppContent />} />
         <Route path="/all-products" element={<AppContent />} />
         <Route path="/admin" element={<AppContent />} />
-        <Route path="/barakasonko" element={<AppContent />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
