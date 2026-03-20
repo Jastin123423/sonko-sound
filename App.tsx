@@ -16,8 +16,9 @@ import AllProductsView from './components/AllProductsView';
 import { Product, User, Category, Comment } from './types';
 
 // Cache helpers
-const PRODUCTS_CACHE_KEY = 'sonko_sound_products_cache_v1';
-const CATEGORIES_CACHE_KEY = 'sonko_sound_categories_cache_v1';
+const PRODUCTS_CACHE_KEY = 'sonko_sound_products_cache_v2';
+const CATEGORIES_CACHE_KEY = 'sonko_sound_categories_cache_v2';
+const CACHE_META_KEY = 'sonko_sound_cache_meta_v2';
 const CACHE_MAX_AGE = 1000 * 60 * 60 * 24 * 365;
 
 // Sonko route base
@@ -75,9 +76,18 @@ const loadFromCache = <T,>(key: string, maxAge = CACHE_MAX_AGE): T | null => {
   }
 };
 
+const saveCacheMeta = (meta: Record<string, any>) => {
+  try {
+    localStorage.setItem(CACHE_META_KEY, JSON.stringify(meta));
+  } catch (error) {
+    console.error('Failed to save cache meta', error);
+  }
+};
+
 const clearStoreCache = () => {
   localStorage.removeItem(PRODUCTS_CACHE_KEY);
   localStorage.removeItem(CATEGORIES_CACHE_KEY);
+  localStorage.removeItem(CACHE_META_KEY);
 };
 
 const getInitialViewFromPath = (pathname: string) => {
@@ -89,6 +99,29 @@ const getInitialViewFromPath = (pathname: string) => {
   if (normalizedPath === '/all-products') return 'all-products';
   if (normalizedPath === '/admin') return 'admin';
   return 'home';
+};
+
+const getDefaultCategoryIcon = (categoryName: string): string => {
+  const name = categoryName.toLowerCase();
+
+  if (name.includes('phone') || name.includes('simu')) return '📱';
+  if (name.includes('tv') || name.includes('television')) return '📺';
+  if (name.includes('sound') || name.includes('sauti')) return '🔊';
+  if (name.includes('camera') || name.includes('kamera')) return '📷';
+  if (name.includes('laptop') || name.includes('kompyuta')) return '💻';
+  if (name.includes('game') || name.includes('mchezo')) return '🎮';
+  if (name.includes('watch') || name.includes('saa')) return '⌚';
+  if (name.includes('home') || name.includes('nyumba')) return '🏠';
+  if (name.includes('kitchen') || name.includes('jikoni')) return '🍳';
+  if (name.includes('car') || name.includes('gari')) return '🚗';
+  if (name.includes('health') || name.includes('afya')) return '❤️';
+  if (name.includes('book') || name.includes('kitabu')) return '📚';
+  if (name.includes('fashion') || name.includes('mitindo')) return '👕';
+  if (name.includes('all') || name.includes('zote')) return '🛒';
+  if (name.includes('electronics') || name.includes('umeme')) return '🔌';
+  if (name.includes('accessories') || name.includes('vifaa')) return '🛍️';
+
+  return '🛒';
 };
 
 /** Watermarked Image Component - For PRODUCT IMAGES only */
@@ -448,29 +481,6 @@ class ErrorBoundary extends React.Component<
   }
 }
 
-const getDefaultCategoryIcon = (categoryName: string): string => {
-  const name = categoryName.toLowerCase();
-
-  if (name.includes('phone') || name.includes('simu')) return '📱';
-  if (name.includes('tv') || name.includes('television')) return '📺';
-  if (name.includes('sound') || name.includes('sauti')) return '🔊';
-  if (name.includes('camera') || name.includes('kamera')) return '📷';
-  if (name.includes('laptop') || name.includes('kompyuta')) return '💻';
-  if (name.includes('game') || name.includes('mchezo')) return '🎮';
-  if (name.includes('watch') || name.includes('saa')) return '⌚';
-  if (name.includes('home') || name.includes('nyumba')) return '🏠';
-  if (name.includes('kitchen') || name.includes('jikoni')) return '🍳';
-  if (name.includes('car') || name.includes('gari')) return '🚗';
-  if (name.includes('health') || name.includes('afya')) return '❤️';
-  if (name.includes('book') || name.includes('kitabu')) return '📚';
-  if (name.includes('fashion') || name.includes('mitindo')) return '👕';
-  if (name.includes('all') || name.includes('zote')) return '🛒';
-  if (name.includes('electronics') || name.includes('umeme')) return '🔌';
-  if (name.includes('accessories') || name.includes('vifaa')) return '🛍️';
-
-  return '🛒';
-};
-
 const normalizeCategory = (cat: any): Category => {
   const backendIcon = cat.icon || cat.icon_name || cat.icon_emoji || cat.icon_url;
 
@@ -772,120 +782,10 @@ const AppContent: React.FC = () => {
     } as Product & { appFlag: number };
   };
 
-  useEffect(() => {
-    const initApp = async () => {
-      try {
-        setIsLoading(true);
-        setFetchError(null);
-        setRouteReady(false);
-
-        const cachedCategories = loadFromCache<Category[]>(CATEGORIES_CACHE_KEY);
-        const cachedProducts = loadFromCache<Product[]>(PRODUCTS_CACHE_KEY);
-
-        if (cachedCategories && cachedProducts) {
-          setCategories(cachedCategories);
-          setProducts(cachedProducts);
-
-          const initialCounts: Record<string, number> = {};
-          const initialViewCounts: Record<string, number> = {};
-
-          cachedProducts.forEach(product => {
-            initialCounts[product.id] = 0;
-            initialViewCounts[product.id] = 0;
-          });
-
-          setCommentCounts(initialCounts);
-          setViewCounts(initialViewCounts);
-          setIsLoading(false);
-          setRouteReady(true);
-
-          void fetchFreshData();
-          return;
-        }
-
-        await fetchFreshData();
-      } catch (error: any) {
-        console.error('❌ App: Failed to initialize app', error);
-        setFetchError(error.message || 'Network or server error');
-        setIsLoading(false);
-        setRouteReady(true);
-      }
-    };
-
-    const fetchFreshData = async () => {
-      try {
-        const [prodRes, catRes] = await Promise.all([
-          fetch('/api/products', {
-            headers: { Accept: 'application/json' }
-          }),
-          fetch('/api/categories', {
-            headers: { Accept: 'application/json' }
-          }),
-        ]);
-
-        const prodData = await prodRes.json().catch(() => ({
-          success: false,
-          error: 'Invalid JSON from products API'
-        }));
-
-        const catData = await catRes.json().catch(() => ({
-          success: false,
-          error: 'Invalid JSON from categories API'
-        }));
-
-        let normalizedCats: Category[] = [];
-        if (catData?.success) {
-          const rawCats = Array.isArray(catData.data) ? catData.data : [];
-          normalizedCats = rawCats.map(normalizeCategory);
-          setCategories(normalizedCats);
-          saveToCache(CATEGORIES_CACHE_KEY, normalizedCats);
-        } else {
-          setFetchError(prev =>
-            prev
-              ? `${prev}; Categories: ${catData?.error}`
-              : `Categories: ${catData?.error || 'Unknown error'}`
-          );
-        }
-
-        if (prodData?.success) {
-          const raw = Array.isArray(prodData.data) ? prodData.data : [];
-          const normalized = raw.map((p: any) => normalizeProduct(p, normalizedCats));
-          setProducts(normalized);
-          saveToCache(PRODUCTS_CACHE_KEY, normalized);
-
-          const initialCounts: Record<string, number> = {};
-          const initialViewCounts: Record<string, number> = {};
-
-          normalized.forEach(product => {
-            initialCounts[product.id] = 0;
-            initialViewCounts[product.id] = 0;
-          });
-
-          setCommentCounts(initialCounts);
-          setViewCounts(initialViewCounts);
-        } else {
-          setFetchError(prev =>
-            prev
-              ? `${prev}; Products: ${prodData?.error}`
-              : `Products: ${prodData?.error || 'Unknown error'}`
-          );
-        }
-      } catch (error: any) {
-        console.error('❌ Failed to fetch fresh data:', error);
-        setFetchError(error.message || 'Network error while fetching fresh data');
-      } finally {
-        setIsLoading(false);
-        setRouteReady(true);
-      }
-    };
-
-    void initApp();
-  }, []);
-
-  const buildCategoryProductMap = useCallback(() => {
+  const buildCategoryProductMap = useCallback((productList: Product[], categoryList: Category[]) => {
     const map: Record<string, Product[]> = {};
 
-    categories.forEach(cat => {
+    categoryList.forEach(cat => {
       map[cat.id] = [];
     });
 
@@ -893,7 +793,7 @@ const AppContent: React.FC = () => {
       map["14"] = [];
     }
 
-    products.forEach(product => {
+    productList.forEach(product => {
       const productData = product as any;
       let matchedCategoryId: string | null = null;
 
@@ -915,7 +815,7 @@ const AppContent: React.FC = () => {
           ''
         ).toLowerCase().trim();
 
-        const matchingCat = categories.find(cat =>
+        const matchingCat = categoryList.find(cat =>
           cat.name.toLowerCase().trim() === productCatName
         );
 
@@ -969,15 +869,135 @@ const AppContent: React.FC = () => {
       });
     });
 
-    setCategoryProductMap(map);
-    console.log('✅ Category product map built');
-  }, [products, categories]);
+    return map;
+  }, []);
 
   useEffect(() => {
-    if (products.length > 0 && categories.length > 0) {
-      buildCategoryProductMap();
-    }
-  }, [products, categories, buildCategoryProductMap]);
+    const initApp = async () => {
+      try {
+        setIsLoading(true);
+        setFetchError(null);
+        setRouteReady(false);
+
+        const cachedCategories = loadFromCache<Category[]>(CATEGORIES_CACHE_KEY);
+        const cachedProducts = loadFromCache<Product[]>(PRODUCTS_CACHE_KEY);
+
+        if (cachedCategories && cachedProducts) {
+          setCategories(cachedCategories);
+          setProducts(cachedProducts);
+          setCategoryProductMap(buildCategoryProductMap(cachedProducts, cachedCategories));
+
+          const initialCounts: Record<string, number> = {};
+          const initialViewCounts: Record<string, number> = {};
+
+          cachedProducts.forEach(product => {
+            initialCounts[product.id] = 0;
+            initialViewCounts[product.id] = 0;
+          });
+
+          setCommentCounts(initialCounts);
+          setViewCounts(initialViewCounts);
+          setIsLoading(false);
+          setRouteReady(true);
+
+          void fetchFreshData();
+          return;
+        }
+
+        await fetchFreshData();
+      } catch (error: any) {
+        console.error('❌ App: Failed to initialize app', error);
+        setFetchError(error.message || 'Network or server error');
+        setIsLoading(false);
+        setRouteReady(true);
+      }
+    };
+
+    const fetchFreshData = async () => {
+      try {
+        const [prodRes, catRes] = await Promise.all([
+          fetch('/api/products', {
+            headers: {
+              Accept: 'application/json',
+              'Cache-Control': 'no-cache'
+            }
+          }),
+          fetch('/api/categories', {
+            headers: {
+              Accept: 'application/json',
+              'Cache-Control': 'no-cache'
+            }
+          }),
+        ]);
+
+        const prodData = await prodRes.json().catch(() => ({
+          success: false,
+          error: 'Invalid JSON from products API'
+        }));
+
+        const catData = await catRes.json().catch(() => ({
+          success: false,
+          error: 'Invalid JSON from categories API'
+        }));
+
+        let normalizedCats: Category[] = categories;
+
+        if (catData?.success) {
+          const rawCats = Array.isArray(catData.data) ? catData.data : [];
+          normalizedCats = rawCats.map(normalizeCategory);
+          setCategories(normalizedCats);
+          saveToCache(CATEGORIES_CACHE_KEY, normalizedCats);
+        } else {
+          setFetchError(prev =>
+            prev
+              ? `${prev}; Categories: ${catData?.error}`
+              : `Categories: ${catData?.error || 'Unknown error'}`
+          );
+        }
+
+        if (prodData?.success) {
+          const raw = Array.isArray(prodData.data) ? prodData.data : [];
+          const normalized = raw.map((p: any) => normalizeProduct(p, normalizedCats));
+
+          setProducts(normalized);
+          setCategoryProductMap(buildCategoryProductMap(normalized, normalizedCats));
+          saveToCache(PRODUCTS_CACHE_KEY, normalized);
+          saveCacheMeta({
+            lastFetchAt: Date.now(),
+            productCount: normalized.length,
+            categoryCount: normalizedCats.length
+          });
+
+          const initialCounts: Record<string, number> = {};
+          const initialViewCounts: Record<string, number> = {};
+
+          normalized.forEach(product => {
+            initialCounts[product.id] = 0;
+            initialViewCounts[product.id] = 0;
+          });
+
+          setCommentCounts(initialCounts);
+          setViewCounts(initialViewCounts);
+        } else {
+          setFetchError(prev =>
+            prev
+              ? `${prev}; Products: ${prodData?.error}`
+              : `Products: ${prodData?.error || 'Unknown error'}`
+          );
+        }
+      } catch (error: any) {
+        console.error('❌ Failed to fetch fresh data:', error);
+        if (!products.length) {
+          setFetchError(error.message || 'Network error while fetching fresh data');
+        }
+      } finally {
+        setIsLoading(false);
+        setRouteReady(true);
+      }
+    };
+
+    void initApp();
+  }, [buildCategoryProductMap]);
 
   const filteredProducts = useMemo(() => {
     if (!searchQuery.trim()) return [];
@@ -1202,7 +1222,6 @@ const AppContent: React.FC = () => {
     setView('product-detail');
     setRouteReady(true);
 
-    // 0 = Baraka Sonko
     if (appFlag === 0) {
       if (isOnSonkoSubdomain) {
         window.location.href = `https://barakasonko.store/product/${productId}`;
@@ -1221,7 +1240,6 @@ const AppContent: React.FC = () => {
       return;
     }
 
-    // 1 = Sonko Sound
     if (isOnMainDomain) {
       navigate(`/sonkosound/product/${productId}`);
     } else {
@@ -1292,6 +1310,13 @@ const AppContent: React.FC = () => {
         setProducts((prev) => {
           const updated = [saved, ...prev];
           saveToCache(PRODUCTS_CACHE_KEY, updated);
+          saveCacheMeta({
+            lastFetchAt: Date.now(),
+            productCount: updated.length,
+            categoryCount: categories.length,
+            invalidatedByPost: true
+          });
+          setCategoryProductMap(buildCategoryProductMap(updated, categories));
           return updated;
         });
 
@@ -1301,12 +1326,14 @@ const AppContent: React.FC = () => {
         return true;
       }
 
+      clearStoreCache();
       const prodRes = await fetch('/api/products');
       const prodData = await prodRes.json().catch(() => null);
 
       if (prodData?.success) {
         const normalized = (prodData.data || []).map((p: any) => normalizeProduct(p, categories));
         setProducts(normalized);
+        setCategoryProductMap(buildCategoryProductMap(normalized, categories));
         saveToCache(PRODUCTS_CACHE_KEY, normalized);
       }
 
@@ -1329,6 +1356,13 @@ const AppContent: React.FC = () => {
         setProducts((prev) => {
           const updated = prev.filter((p) => String(p.id) !== String(id));
           saveToCache(PRODUCTS_CACHE_KEY, updated);
+          saveCacheMeta({
+            lastFetchAt: Date.now(),
+            productCount: updated.length,
+            categoryCount: categories.length,
+            invalidatedByDelete: true
+          });
+          setCategoryProductMap(buildCategoryProductMap(updated, categories));
           return updated;
         });
 
@@ -1627,6 +1661,7 @@ const AppContent: React.FC = () => {
               title="Daily Discoveries"
               products={products}
               onProductClick={handleProductClick}
+              WatermarkedImage={WatermarkedImage}
             />
           </>
         ) : view === 'all-products' ? (
@@ -1667,6 +1702,7 @@ const AppContent: React.FC = () => {
             <ProductGrid
               products={categoryProducts}
               onProductClick={handleProductClick}
+              WatermarkedImage={WatermarkedImage}
               emptyMessage={`No products found in ${selectedCategory.name} category`}
             />
           </div>
@@ -1697,6 +1733,7 @@ const AppContent: React.FC = () => {
             <ProductGrid
               products={filteredProducts}
               onProductClick={handleProductClick}
+              WatermarkedImage={WatermarkedImage}
             />
           </div>
         ) : view === 'categories' ? (
