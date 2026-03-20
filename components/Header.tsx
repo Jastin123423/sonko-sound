@@ -203,10 +203,20 @@ const Header: React.FC<HeaderProps> = ({
   const handleInsideTabClick = (tabId: 'sonko' | 'baraka') => {
     setActiveInsideTab(tabId);
 
-    if (tabId === 'baraka' && onBarakasonkoClick) {
-      onBarakasonkoClick();
-    } else if (tabId === 'sonko' && onSonkoClick) {
-      onSonkoClick();
+    if (tabId === 'baraka') {
+      // Navigate to Baraka Sonko store
+      if (onBarakasonkoClick) {
+        onBarakasonkoClick();
+      } else {
+        window.location.href = 'https://barakasonko.store';
+      }
+    } else if (tabId === 'sonko') {
+      if (onSonkoClick) {
+        onSonkoClick();
+      } else {
+        // Navigate to Sonko Sound page (stay on current site but could also be external)
+        window.location.href = 'https://sonkosound.barakasonko.store';
+      }
     }
   };
 
