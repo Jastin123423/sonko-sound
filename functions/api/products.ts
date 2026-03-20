@@ -1,4 +1,3 @@
-
 import type { PagesFunction } from '@cloudflare/workers-types';
 
 type Env = { DB: D1Database };
@@ -21,19 +20,6 @@ export const onRequestOptions: PagesFunction = async () =>
 // Default product video
 const DEFAULT_VIDEO_URL =
   'https://media.barakasonko.store/uploads/Facebook_1770123707890(720p).mp4';
-
-// Sound app allowed categories
-const SOUND_CATEGORY_NAMES = [
-  'Spika',
-  'Mic',
-  'Subwoofer',
-  'TV',
-  'Guitars',
-  'Keyboards',
-  'Hon Speaker',
-  'Studio Accessories',
-  'Mixers',
-];
 
 const safeJsonParseArray = (v: any): string[] => {
   if (!v) return [];
@@ -98,6 +84,7 @@ const buildProductResponse = (row: any) => {
   const imagesArr = safeJsonParseArray(row.images);
   const descArr = safeJsonParseArray(row.description_images);
   const imageVariants = safeJsonParseImageVariants(row.image_variants);
+  const appFlag = Number(row.app_flag ?? 0);
 
   return {
     id: String(row.id),
@@ -146,6 +133,9 @@ const buildProductResponse = (row: any) => {
     createdAt: String(row.created_at || ''),
     updated_at: String(row.updated_at || ''),
     updatedAt: String(row.updated_at || ''),
+
+    app_flag: appFlag,
+    appFlag,
   };
 };
 
@@ -156,23 +146,13 @@ const getProductById = async (env: Env, id: string) => {
       id, title, image, images, description_images, video_url,
       price, original_price, discount, sold_count, order_count, rating,
       category_id, category_name, status, created_at, updated_at,
-      description, image_variants
+      description, image_variants, app_flag
     FROM products
     WHERE id = ?
     `
   )
     .bind(id)
     .first<any>();
-};
-
-const getAllowedSoundCategoryIds = async (env: Env): Promise<string[]> => {
-  const placeholders = SOUND_CATEGORY_NAMES.map(() => '?').join(', ');
-  const { results } = await env.DB
-    .prepare(`SELECT id FROM categories WHERE name IN (${placeholders})`)
-    .bind(...SOUND_CATEGORY_NAMES)
-    .all<any>();
-
-  return (results || []).map((row: any) => String(row.id));
 };
 
 const normalizeIncomingProduct = (body: any, existing?: any) => {
@@ -289,6 +269,15 @@ const normalizeIncomingProduct = (body: any, existing?: any) => {
       ? String(body.status || 'online')
       : String(existing?.status || 'online');
 
+  // 0 = Baraka Sonko, 1 = Sonko Sound
+  // This API defaults to Baraka Sonko when not provided.
+  const appFlag =
+    body.app_flag !== undefined || body.appFlag !== undefined || body.app !== undefined
+      ? Number(body.app_flag ?? body.appFlag ?? body.app ?? 0)
+      : existing?.app_flag == null
+        ? 0
+        : Number(existing.app_flag);
+
   return {
     title,
     description,
@@ -306,6 +295,7 @@ const normalizeIncomingProduct = (body: any, existing?: any) => {
     orderCount,
     rating: Number.isFinite(Number(rating)) ? Number(rating) : 5.0,
     status,
+    appFlag: appFlag === 1 ? 1 : 0,
   };
 };
 
@@ -318,38 +308,22 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, request }) => {
     const app = String(url.searchParams.get('app') || '').trim().toLowerCase();
     const limit = Math.min(Math.max(Number(url.searchParams.get('limit') || 200), 1), 500);
 
-    let allowedCategoryIds: string[] = [];
-
-    if (app === 'sound') {
-      allowedCategoryIds = await getAllowedSoundCategoryIds(env);
-    }
-
     if (id) {
       let query = `
         SELECT
           id, title, image, images, description_images, video_url,
           price, original_price, discount, sold_count, order_count, rating,
           category_id, category_name, status, created_at, updated_at,
-          description, image_variants
+          description, image_variants, app_flag
         FROM products
         WHERE id = ?
       `;
       const binds: any[] = [id];
 
       if (app === 'sound') {
-        if (!allowedCategoryIds.length) {
-          return json({ success: false, error: 'Not found' }, 404);
-        }
-
-        const idPlaceholders = allowedCategoryIds.map(() => '?').join(', ');
-        const namePlaceholders = SOUND_CATEGORY_NAMES.map(() => '?').join(', ');
-
-        query += ` AND (
-          category_id IN (${idPlaceholders})
-          OR category_name IN (${namePlaceholders})
-        )`;
-
-        binds.push(...allowedCategoryIds, ...SOUND_CATEGORY_NAMES);
+        query += ` AND app_flag = 1`;
+      } else if (app === 'baraka') {
+        query += ` AND app_flag = 0`;
       }
 
       const row = await env.DB.prepare(query).bind(...binds).first<any>();
@@ -363,31 +337,15 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, request }) => {
         id, title, image, images, description_images, video_url,
         price, original_price, discount, sold_count, order_count, rating,
         category_id, category_name, status, created_at, updated_at,
-        description, image_variants
+        description, image_variants, app_flag
       FROM products
     `;
     const binds: any[] = [];
 
     if (app === 'sound') {
-      if (!allowedCategoryIds.length) {
-        return json({
-          success: true,
-          app,
-          filtered: true,
-          count: 0,
-          data: [],
-        });
-      }
-
-      const idPlaceholders = allowedCategoryIds.map(() => '?').join(', ');
-      const namePlaceholders = SOUND_CATEGORY_NAMES.map(() => '?').join(', ');
-
-      query += ` WHERE (
-        category_id IN (${idPlaceholders})
-        OR category_name IN (${namePlaceholders})
-      )`;
-
-      binds.push(...allowedCategoryIds, ...SOUND_CATEGORY_NAMES);
+      query += ` WHERE app_flag = 1`;
+    } else if (app === 'baraka') {
+      query += ` WHERE app_flag = 0`;
     }
 
     query += ` ORDER BY datetime(created_at) DESC LIMIT ?`;
@@ -399,7 +357,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, request }) => {
     return json({
       success: true,
       app,
-      filtered: app === 'sound',
+      filtered: app === 'sound' || app === 'baraka',
       count: list.length,
       data: list,
     });
@@ -435,14 +393,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, request }) => {
         sold_count, order_count, rating,
         category_id, category_name,
         status, created_at, updated_at,
-        description, image_variants
+        description, image_variants, app_flag
       ) VALUES (
         ?, ?, ?, ?, ?, ?,
         ?, ?, ?,
         ?, ?, ?,
         ?, ?,
         ?, ?, ?,
-        ?, ?
+        ?, ?, ?
       )
       `
     )
@@ -465,7 +423,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, request }) => {
         String(body.created_at || body.createdAt || now),
         now,
         normalized.description,
-        JSON.stringify(normalized.imageVariants)
+        JSON.stringify(normalized.imageVariants),
+        normalized.appFlag
       )
       .run();
 
@@ -523,7 +482,8 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, request }) => {
         status = ?,
         updated_at = ?,
         description = ?,
-        image_variants = ?
+        image_variants = ?,
+        app_flag = ?
       WHERE id = ?
       `
     )
@@ -545,6 +505,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, request }) => {
         now,
         normalized.description,
         JSON.stringify(normalized.imageVariants),
+        normalized.appFlag,
         id
       )
       .run();
@@ -603,7 +564,8 @@ export const onRequestPatch: PagesFunction<Env> = async ({ env, request }) => {
         status = ?,
         updated_at = ?,
         description = ?,
-        image_variants = ?
+        image_variants = ?,
+        app_flag = ?
       WHERE id = ?
       `
     )
@@ -625,6 +587,7 @@ export const onRequestPatch: PagesFunction<Env> = async ({ env, request }) => {
         now,
         normalized.description,
         JSON.stringify(normalized.imageVariants),
+        normalized.appFlag,
         id
       )
       .run();
