@@ -3,62 +3,34 @@ import { ICONS } from '../constants';
 import { Product } from '../types';
 
 /* ===============================
-   SONKOSOUND ROUTING HELPERS
+   STORE HELPERS
 ================================= */
 
-const SOUND_CATEGORY_NAMES = [
-  'Spika',
-  'Mic',
-  'Subwoofer',
-  'TV',
-  'Guitars',
-  'Keyboards',
-  'Hon Speaker',
-  'Studio Accessories',
-  'Mixers',
-];
+const getProductAppFlag = (product: any): number => {
+  const raw =
+    product?.app_flag ??
+    product?.appFlag ??
+    product?.app ??
+    product?.is_sound_product ??
+    product?.isSoundProduct ??
+    1;
 
-const isSoundProduct = (product: any) => {
-  const explicitFlag =
-    product?.is_sound_product === true ||
-    product?.isSoundProduct === true ||
-    product?.is_sound_product === 1 ||
-    product?.isSoundProduct === 1;
-
-  if (explicitFlag) return true;
-
-  const categoryName = String(
-    product?.category_name ??
-    product?.categoryName ??
-    product?.category ??
-    ''
-  ).trim();
-
-  return SOUND_CATEGORY_NAMES.includes(categoryName);
+  const num = Number(raw);
+  return num === 0 ? 0 : 1;
 };
 
-const openProductSmart = (product: any, fallbackOpen: (product: Product) => void) => {
-  const productId = String(product?.id ?? '').trim();
-  if (!productId) {
-    fallbackOpen(product);
-    return;
-  }
-
-  if (isSoundProduct(product)) {
-    window.location.href = `https://sonkosound.barakasonko.store/product/${productId}`;
-    return;
-  }
-
-  fallbackOpen(product);
+const getStoreLabel = (product: any): 'Baraka Sonko' | 'Sonko Sound' => {
+  return getProductAppFlag(product) === 0 ? 'Baraka Sonko' : 'Sonko Sound';
 };
 
 /* ===============================
-   PRODUCT CARD - Alibaba Style with Subtle Backgrounds
+   PRODUCT CARD
 ================================= */
 
 const ProductCard: React.FC<{ product: Product; onClick: () => void }> = ({ product, onClick }) => {
   const price = Number((product as any).price ?? 0);
   const discount = Number((product as any).discount ?? 0);
+  const appFlag = getProductAppFlag(product);
 
   const safePrice = Number.isFinite(price) ? price : 0;
   const safeDiscount = Number.isFinite(discount) ? discount : 0;
@@ -66,13 +38,15 @@ const ProductCard: React.FC<{ product: Product; onClick: () => void }> = ({ prod
   const originalPrice =
     (product as any).originalPrice && Number.isFinite(Number((product as any).originalPrice))
       ? Number((product as any).originalPrice)
-      : safeDiscount > 0
-        ? Math.round(safePrice * (1 + safeDiscount / 100))
-        : null;
+      : (product as any).original_price && Number.isFinite(Number((product as any).original_price))
+        ? Number((product as any).original_price)
+        : safeDiscount > 0
+          ? Math.round(safePrice * (1 + safeDiscount / 100))
+          : null;
 
   const showDiscount =
     safeDiscount > 0 &&
-    originalPrice &&
+    !!originalPrice &&
     originalPrice > safePrice;
 
   return (
@@ -94,6 +68,18 @@ const ProductCard: React.FC<{ product: Product; onClick: () => void }> = ({ prod
           </div>
         )}
 
+        <div className="absolute top-2 right-2 z-10">
+          <span
+            className={`text-[10px] px-2 py-1 rounded-lg font-bold shadow-sm ${
+              appFlag === 0
+                ? 'bg-blue-50 text-blue-700 border border-blue-100'
+                : 'bg-orange-50 text-orange-700 border border-orange-100'
+            }`}
+          >
+            {appFlag === 0 ? 'Baraka Sonko' : 'Sonko Sound'}
+          </span>
+        </div>
+
         <div className="absolute bottom-2 right-2 p-2 bg-white/90 backdrop-blur-sm rounded-full text-gray-400 hover:text-[#FF6A00] transition-colors opacity-0 group-hover:opacity-100">
           <ICONS.Heart />
         </div>
@@ -105,7 +91,7 @@ const ProductCard: React.FC<{ product: Product; onClick: () => void }> = ({ prod
             {(product as any).title || 'Untitled'}
           </h3>
 
-          <div className="flex items-center gap-2 pt-1">
+          <div className="flex items-center gap-2 pt-1 flex-wrap">
             {showDiscount && originalPrice && (
               <span className="text-[11px] text-gray-400 line-through">
                 TSh {originalPrice.toLocaleString()}
@@ -123,12 +109,16 @@ const ProductCard: React.FC<{ product: Product; onClick: () => void }> = ({ prod
               <span className="text-[11px] text-gray-600 font-semibold">
                 {typeof (product as any).rating === 'number'
                   ? (product as any).rating.toFixed(1)
-                  : '5.0'}
+                  : Number.isFinite(Number((product as any).rating))
+                    ? Number((product as any).rating).toFixed(1)
+                    : '5.0'}
               </span>
             </div>
-            
+
             <span className="text-[9px] text-gray-400">
-              {Math.floor(Math.random() * 50) + 10}+ sold
+              {(product as any).soldCount ||
+                (product as any).sold_count ||
+                `${Math.floor(Math.random() * 50) + 10}+ sold`}
             </span>
           </div>
         </div>
@@ -166,6 +156,8 @@ const normalizeProduct = (p: any): Product => {
     title: String(p?.title ?? p?.name ?? 'Untitled').trim(),
     price: Number.isFinite(Number(p?.price)) ? Number(p?.price) : 0,
     discount: Number.isFinite(Number(p?.discount)) ? Number(p?.discount) : 0,
+    appFlag: getProductAppFlag(p),
+    app_flag: getProductAppFlag(p),
   } as Product;
 };
 
@@ -204,7 +196,7 @@ let cachedHasMore = true;
 let activeFetchPromise: Promise<void> | null = null;
 
 /* ===============================
-   PRODUCT GRID - Alibaba Style with Subtle Backgrounds
+   PRODUCT GRID
 ================================= */
 
 interface ProductGridProps {
@@ -263,7 +255,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({
   }, [displayProducts]);
 
   const handleProductClick = useCallback((product: Product) => {
-    openProductSmart(product, onProductClick);
+    onProductClick(product);
   }, [onProductClick]);
 
   const loadMoreFromApi = useCallback(async () => {
@@ -330,7 +322,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({
     if (totalNow >= API_LIMIT) return;
     if (!cachedHasMore) return;
 
-    loadMoreFromApi();
+    void loadMoreFromApi();
   }, [normalizedProducts.length, apiProducts.length, loadMoreFromApi]);
 
   useEffect(() => {
@@ -343,7 +335,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({
         const first = entries[0];
         if (!first?.isIntersecting) return;
         if (loadingMore) return;
-        loadMoreFromApi();
+        void loadMoreFromApi();
       },
       {
         threshold: 0.01,
