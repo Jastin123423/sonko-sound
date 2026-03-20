@@ -639,6 +639,13 @@ const AppContent: React.FC = () => {
     navigate(inSonkoSection ? withSonkoBase(path) : path);
   }, [navigate, inSonkoSection]);
 
+  const currentHost =
+    typeof window !== 'undefined' ? window.location.hostname.toLowerCase() : '';
+
+  const isOnSonkoSubdomain = currentHost === 'sonkosound.barakasonko.store';
+  const isOnMainDomain =
+    currentHost === 'barakasonko.store' || currentHost === 'www.barakasonko.store';
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const [view, setView] = useState<
@@ -741,8 +748,6 @@ const AppContent: React.FC = () => {
       category_id: categoryId || undefined,
       category_name: categoryName,
       categoryIcon: getProductCategoryIcon(),
-
-      // 1 = Sonko Sound, 0 = Baraka Sonko
       appFlag: Number(
         p?.app_flag ??
         p?.appFlag ??
@@ -750,7 +755,6 @@ const AppContent: React.FC = () => {
         p?.is_sonko_sound ??
         1
       ),
-
       image: p?.image || p?.image_url || (Array.isArray(p?.images) ? p.images[0] : '') || '',
       images: Array.isArray(p?.images)
         ? p.images
@@ -998,15 +1002,23 @@ const AppContent: React.FC = () => {
   const handleCategorySelect = (category: Category) => {
     setIsSidebarOpen(false);
 
-    const categoryFlag = Number((category as any).appFlag ?? 1);
+    const categoryFlag = Number((category as any).appFlag ?? (category as any).app_flag ?? 1);
 
     if (category.id === '14' || category.name === 'Bidhaa Zote') {
       setView('all-products');
 
       if (categoryFlag === 0) {
+        if (isOnSonkoSubdomain) {
+          window.location.href = 'https://barakasonko.store/all-products';
+          return;
+        }
         navigate('/all-products');
       } else {
-        navigate('/sonkosound/all-products');
+        if (isOnMainDomain) {
+          navigate('/sonkosound/all-products');
+        } else {
+          navigate('/all-products');
+        }
       }
 
       window.scrollTo(0, 0);
@@ -1019,9 +1031,17 @@ const AppContent: React.FC = () => {
     setView('category-results');
 
     if (categoryFlag === 0) {
+      if (isOnSonkoSubdomain) {
+        window.location.href = `https://barakasonko.store/category/${category.id}`;
+        return;
+      }
       navigate(`/category/${category.id}`);
     } else {
-      navigate(`/sonkosound/category/${category.id}`);
+      if (isOnMainDomain) {
+        navigate(`/sonkosound/category/${category.id}`);
+      } else {
+        navigate(`/category/${category.id}`);
+      }
     }
 
     window.scrollTo(0, 0);
@@ -1173,24 +1193,46 @@ const AppContent: React.FC = () => {
   };
 
   const handleProductClick = (product: Product) => {
+    const productId = String(product?.id || '').trim();
+    if (!productId) return;
+
+    const appFlag = Number((product as any).appFlag ?? (product as any).app_flag ?? 1);
+
     setSelectedProduct(product);
     setView('product-detail');
     setRouteReady(true);
 
-    const appFlag = Number((product as any).appFlag ?? 1);
-
+    // 0 = Baraka Sonko
     if (appFlag === 0) {
-      navigate(`/product/${product.id}`);
-    } else {
-      navigate(`/sonkosound/product/${product.id}`);
+      if (isOnSonkoSubdomain) {
+        window.location.href = `https://barakasonko.store/product/${productId}`;
+        return;
+      }
+
+      navigate(`/product/${productId}`);
+
+      void fetchCommentsForProduct(productId);
+      void (async () => {
+        const viewerKey = getOrCreateUserId();
+        const newCount = await ViewsService.recordView(productId, viewerKey);
+        setViewCounts(prev => ({ ...prev, [productId]: newCount }));
+      })();
+
+      return;
     }
 
-    void fetchCommentsForProduct(product.id);
+    // 1 = Sonko Sound
+    if (isOnMainDomain) {
+      navigate(`/sonkosound/product/${productId}`);
+    } else {
+      navigate(`/product/${productId}`);
+    }
 
+    void fetchCommentsForProduct(productId);
     void (async () => {
       const viewerKey = getOrCreateUserId();
-      const newCount = await ViewsService.recordView(product.id, viewerKey);
-      setViewCounts(prev => ({ ...prev, [product.id]: newCount }));
+      const newCount = await ViewsService.recordView(productId, viewerKey);
+      setViewCounts(prev => ({ ...prev, [productId]: newCount }));
     })();
   };
 
@@ -1357,6 +1399,12 @@ const AppContent: React.FC = () => {
     setSearchQuery('');
     setView('home');
     setRouteReady(true);
+
+    if (isOnSonkoSubdomain) {
+      window.location.href = 'https://barakasonko.store';
+      return;
+    }
+
     navigate('/');
   };
 
@@ -1365,7 +1413,12 @@ const AppContent: React.FC = () => {
     setSelectedCategory(null);
     setView('home');
     setRouteReady(true);
-    navigate('/sonkosound');
+
+    if (isOnMainDomain) {
+      navigate('/sonkosound');
+    } else {
+      navigate('/');
+    }
   };
 
   useEffect(() => {
@@ -1574,7 +1627,6 @@ const AppContent: React.FC = () => {
               title="Daily Discoveries"
               products={products}
               onProductClick={handleProductClick}
-              WatermarkedImage={WatermarkedImage}
             />
           </>
         ) : view === 'all-products' ? (
@@ -1615,7 +1667,6 @@ const AppContent: React.FC = () => {
             <ProductGrid
               products={categoryProducts}
               onProductClick={handleProductClick}
-              WatermarkedImage={WatermarkedImage}
               emptyMessage={`No products found in ${selectedCategory.name} category`}
             />
           </div>
@@ -1646,7 +1697,6 @@ const AppContent: React.FC = () => {
             <ProductGrid
               products={filteredProducts}
               onProductClick={handleProductClick}
-              WatermarkedImage={WatermarkedImage}
             />
           </div>
         ) : view === 'categories' ? (
@@ -1678,8 +1728,9 @@ const AppContent: React.FC = () => {
         <BottomNav
           currentView={navView as any}
           onViewChange={(v: any) => {
-            if (v === 'admin') handleAdminAccess();
-            else if (v === 'home') {
+            if (v === 'admin') {
+              handleAdminAccess();
+            } else if (v === 'home') {
               setView('home');
               setRouteReady(true);
               goToScopedPath('/');
