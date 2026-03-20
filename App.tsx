@@ -20,6 +20,23 @@ const PRODUCTS_CACHE_KEY = 'sonko_sound_products_cache_v1';
 const CATEGORIES_CACHE_KEY = 'sonko_sound_categories_cache_v1';
 const CACHE_MAX_AGE = 1000 * 60 * 60 * 24 * 365;
 
+// Sonko route base
+const SONKO_BASE = '/sonkosound';
+
+const isSonkoPath = (pathname: string) =>
+  pathname === SONKO_BASE || pathname.startsWith(`${SONKO_BASE}/`);
+
+const stripSonkoBase = (pathname: string) => {
+  if (!isSonkoPath(pathname)) return pathname;
+  const stripped = pathname.slice(SONKO_BASE.length);
+  return stripped || '/';
+};
+
+const withSonkoBase = (path: string) => {
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  return normalized === '/' ? SONKO_BASE : `${SONKO_BASE}${normalized}`;
+};
+
 type CachePayload<T> = {
   timestamp: number;
   data: T;
@@ -64,11 +81,13 @@ const clearStoreCache = () => {
 };
 
 const getInitialViewFromPath = (pathname: string) => {
-  if (pathname.startsWith('/product/')) return 'product-detail';
-  if (pathname.startsWith('/category/')) return 'category-results';
-  if (pathname === '/categories') return 'categories';
-  if (pathname === '/all-products') return 'all-products';
-  if (pathname === '/admin') return 'admin';
+  const normalizedPath = stripSonkoBase(pathname);
+
+  if (normalizedPath.startsWith('/product/')) return 'product-detail';
+  if (normalizedPath.startsWith('/category/')) return 'category-results';
+  if (normalizedPath === '/categories') return 'categories';
+  if (normalizedPath === '/all-products') return 'all-products';
+  if (normalizedPath === '/admin') return 'admin';
   return 'home';
 };
 
@@ -607,6 +626,13 @@ const AppContent: React.FC = () => {
   const location = useLocation();
   const { productId, categoryId } = useParams<{ productId: string; categoryId: string }>();
 
+  const normalizedPath = stripSonkoBase(location.pathname);
+  const inSonkoSection = isSonkoPath(location.pathname);
+
+  const goToScopedPath = useCallback((path: string) => {
+    navigate(inSonkoSection ? withSonkoBase(path) : path);
+  }, [navigate, inSonkoSection]);
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const [view, setView] = useState<
@@ -733,7 +759,6 @@ const AppContent: React.FC = () => {
         setFetchError(null);
         setRouteReady(false);
 
-        // Try to load from cache first
         const cachedCategories = loadFromCache<Category[]>(CATEGORIES_CACHE_KEY);
         const cachedProducts = loadFromCache<Product[]>(PRODUCTS_CACHE_KEY);
 
@@ -752,20 +777,18 @@ const AppContent: React.FC = () => {
           setCommentCounts(initialCounts);
           setViewCounts(initialViewCounts);
           setIsLoading(false);
-          setRouteReady(true); // Mark route as ready immediately
-          
-          // Fetch fresh data in background
+          setRouteReady(true);
+
           fetchFreshData();
           return;
         }
 
-        // No cache, fetch fresh data
         await fetchFreshData();
       } catch (error: any) {
         console.error('❌ App: Failed to initialize app', error);
         setFetchError(error.message || 'Network or server error');
         setIsLoading(false);
-        setRouteReady(true); // Still mark route as ready to show error UI
+        setRouteReady(true);
       }
     };
 
@@ -953,7 +976,7 @@ const AppContent: React.FC = () => {
   const handleSearch = (query: string) => {
     setSearchQuery(query);
     setView('search-results');
-    navigate('/');
+    goToScopedPath('/');
   };
 
   const handleCategorySelect = (category: Category) => {
@@ -961,7 +984,7 @@ const AppContent: React.FC = () => {
 
     if (category.id === '14' || category.name === 'Bidhaa Zote') {
       setView('all-products');
-      navigate('/all-products');
+      goToScopedPath('/all-products');
       window.scrollTo(0, 0);
       return;
     }
@@ -970,7 +993,7 @@ const AppContent: React.FC = () => {
     setCategoryProducts(productsForCategory);
     setSelectedCategory(category);
     setView('category-results');
-    navigate(`/category/${category.id}`);
+    goToScopedPath(`/category/${category.id}`);
     window.scrollTo(0, 0);
   };
 
@@ -1024,6 +1047,11 @@ const AppContent: React.FC = () => {
       setIsLoadingComments(prev => ({ ...prev, [productId]: false }));
     }
   };
+
+  const [user, setUser] = useState<User | null>(() => {
+    const saved = localStorage.getItem('sonko_user');
+    return saved ? JSON.parse(saved) : null;
+  });
 
   const handleAddComment = async (productId: string, content: string) => {
     try {
@@ -1118,7 +1146,7 @@ const AppContent: React.FC = () => {
     setSelectedProduct(product);
     setView('product-detail');
     setRouteReady(true);
-    navigate(`/product/${product.id}`);
+    goToScopedPath(`/product/${product.id}`);
 
     fetchCommentsForProduct(product.id);
 
@@ -1163,11 +1191,6 @@ const AppContent: React.FC = () => {
       setIsRecordingView(prev => ({ ...prev, [pid]: false }));
     }
   }, [selectedProduct?.id, isRecordingView]);
-
-  const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('sonko_user');
-    return saved ? JSON.parse(saved) : null;
-  });
 
   const [showAuth, setShowAuth] = useState(false);
 
@@ -1258,7 +1281,7 @@ const AppContent: React.FC = () => {
     else {
       setView('admin');
       setRouteReady(true);
-      navigate('/admin');
+      goToScopedPath('/admin');
     }
   };
 
@@ -1268,7 +1291,7 @@ const AppContent: React.FC = () => {
     setShowAuth(false);
     setView('admin');
     setRouteReady(true);
-    navigate('/admin');
+    goToScopedPath('/admin');
   };
 
   const handleLogout = () => {
@@ -1276,14 +1299,14 @@ const AppContent: React.FC = () => {
     localStorage.removeItem('sonko_user');
     setView('home');
     setRouteReady(true);
-    navigate('/');
+    goToScopedPath('/');
   };
 
   const handleBackToHome = () => {
     setSelectedProduct(null);
     setView('home');
     setRouteReady(true);
-    navigate('/');
+    goToScopedPath('/');
   };
 
   const handleRefreshCachedData = async () => {
@@ -1292,13 +1315,20 @@ const AppContent: React.FC = () => {
   };
 
   const handleBarakasonkoClick = () => {
-    window.location.href = 'https://barakasonko.store';
-  };
-
-  const handleSonkoClick = () => {
+    setSelectedProduct(null);
+    setSelectedCategory(null);
+    setSearchQuery('');
     setView('home');
     setRouteReady(true);
     navigate('/');
+  };
+
+  const handleSonkoClick = () => {
+    setSelectedProduct(null);
+    setSelectedCategory(null);
+    setView('home');
+    setRouteReady(true);
+    navigate('/sonkosound');
   };
 
   useEffect(() => {
@@ -1306,34 +1336,34 @@ const AppContent: React.FC = () => {
 
     const pathView = getInitialViewFromPath(location.pathname) as any;
 
-    if (location.pathname === '/') {
+    if (normalizedPath === '/') {
       setSelectedProduct(null);
       setView(searchQuery ? 'search-results' : 'home');
       setRouteReady(true);
       return;
     }
 
-    if (location.pathname.startsWith('/all-products')) {
+    if (normalizedPath.startsWith('/all-products')) {
       setView('all-products');
       setRouteReady(true);
       return;
     }
 
-    if (location.pathname.startsWith('/categories')) {
+    if (normalizedPath.startsWith('/categories')) {
       setView('categories');
       setRouteReady(true);
       return;
     }
 
-    if (location.pathname.startsWith('/admin')) {
+    if (normalizedPath.startsWith('/admin')) {
       setView('admin');
       setRouteReady(true);
       return;
     }
 
-    if (location.pathname.startsWith('/product/')) {
+    if (normalizedPath.startsWith('/product/')) {
       if (!productId) {
-        navigate('/', { replace: true });
+        navigate(inSonkoSection ? '/sonkosound' : '/', { replace: true });
         return;
       }
 
@@ -1352,14 +1382,14 @@ const AppContent: React.FC = () => {
           setViewCounts(prev => ({ ...prev, [product.id]: newCount }));
         })();
       } else {
-        navigate('/', { replace: true });
+        navigate(inSonkoSection ? '/sonkosound' : '/', { replace: true });
       }
       return;
     }
 
-    if (location.pathname.startsWith('/category/')) {
+    if (normalizedPath.startsWith('/category/')) {
       if (!categoryId) {
-        navigate('/', { replace: true });
+        navigate(inSonkoSection ? '/sonkosound' : '/', { replace: true });
         return;
       }
 
@@ -1371,14 +1401,26 @@ const AppContent: React.FC = () => {
         setView('category-results');
         setRouteReady(true);
       } else {
-        navigate('/', { replace: true });
+        navigate(inSonkoSection ? '/sonkosound' : '/', { replace: true });
       }
       return;
     }
 
     setView(pathView);
     setRouteReady(true);
-  }, [isLoading, location.pathname, productId, categoryId, products, categories, categoryProductMap, navigate, searchQuery]);
+  }, [
+    isLoading,
+    location.pathname,
+    normalizedPath,
+    inSonkoSection,
+    productId,
+    categoryId,
+    products,
+    categories,
+    categoryProductMap,
+    navigate,
+    searchQuery
+  ]);
 
   const navView =
     view === 'admin'
@@ -1469,7 +1511,7 @@ const AppContent: React.FC = () => {
           <>
             <QuickActions onActionSelect={() => {
               setView('all-products');
-              navigate('/all-products');
+              goToScopedPath('/all-products');
             }} />
 
             <CategorySection
@@ -1477,7 +1519,7 @@ const AppContent: React.FC = () => {
               onCategorySelect={handleCategorySelect}
               onMore={() => {
                 setView('categories');
-                navigate('/categories');
+                goToScopedPath('/categories');
               }}
             />
 
@@ -1486,7 +1528,7 @@ const AppContent: React.FC = () => {
               onProductClick={handleProductClick}
               onSeeAll={() => {
                 setView('all-products');
-                navigate('/all-products');
+                goToScopedPath('/all-products');
               }}
               WatermarkedImage={WatermarkedImage}
             />
@@ -1526,7 +1568,7 @@ const AppContent: React.FC = () => {
                 className="text-xs font-black text-orange-600"
                 onClick={() => {
                   setView('all-products');
-                  navigate('/all-products');
+                  goToScopedPath('/all-products');
                 }}
               >
                 View All Products
@@ -1575,7 +1617,7 @@ const AppContent: React.FC = () => {
             onCategorySelect={handleCategorySelect}
             onShowAllProducts={() => {
               setView('all-products');
-              navigate('/all-products');
+              goToScopedPath('/all-products');
             }}
             suggestedProducts={products}
             onProductClick={handleProductClick}
@@ -1603,15 +1645,15 @@ const AppContent: React.FC = () => {
             else if (v === 'home') {
               setView('home');
               setRouteReady(true);
-              navigate('/');
+              goToScopedPath('/');
             } else if (v === 'categories') {
               setView('categories');
               setRouteReady(true);
-              navigate('/categories');
+              goToScopedPath('/categories');
             } else if (v === 'all-products') {
               setView('all-products');
               setRouteReady(true);
-              navigate('/all-products');
+              goToScopedPath('/all-products');
             }
           }}
         />
@@ -1628,12 +1670,22 @@ const App: React.FC = () => {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Main routes */}
         <Route path="/" element={<AppContent />} />
         <Route path="/product/:productId" element={<AppContent />} />
         <Route path="/category/:categoryId" element={<AppContent />} />
         <Route path="/categories" element={<AppContent />} />
         <Route path="/all-products" element={<AppContent />} />
         <Route path="/admin" element={<AppContent />} />
+
+        {/* Sonko Sound routes under main domain */}
+        <Route path="/sonkosound" element={<AppContent />} />
+        <Route path="/sonkosound/product/:productId" element={<AppContent />} />
+        <Route path="/sonkosound/category/:categoryId" element={<AppContent />} />
+        <Route path="/sonkosound/categories" element={<AppContent />} />
+        <Route path="/sonkosound/all-products" element={<AppContent />} />
+        <Route path="/sonkosound/admin" element={<AppContent />} />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
