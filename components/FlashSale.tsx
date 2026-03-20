@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { COLORS } from '../constants';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Product } from '../types';
 
 interface FlashSaleProps {
@@ -7,6 +6,18 @@ interface FlashSaleProps {
   onProductClick: (product: Product) => void;
   onSeeAll: () => void;
 }
+
+const getProductAppFlag = (product: any): number => {
+  const raw =
+    product?.app_flag ??
+    product?.appFlag ??
+    product?.app ??
+    product?.is_sound_product ??
+    product?.isSoundProduct ??
+    0;
+
+  return Number(raw) === 1 ? 1 : 0;
+};
 
 const FlashSale: React.FC<FlashSaleProps> = ({ products, onProductClick, onSeeAll }) => {
   const [timeLeft, setTimeLeft] = useState({ h: 12, m: 45, s: 30 });
@@ -40,9 +51,13 @@ const FlashSale: React.FC<FlashSaleProps> = ({ products, onProductClick, onSeeAl
     return () => clearInterval(timer);
   }, []);
 
+  const barakaOnlyProducts = useMemo(() => {
+    return (products || []).filter((p) => getProductAppFlag(p) === 0);
+  }, [products]);
+
   useEffect(() => {
     const container = scrollRef.current;
-    if (!container || products.length === 0) return;
+    if (!container || barakaOnlyProducts.length === 0) return;
 
     const startAutoScroll = () => {
       stopAutoScroll();
@@ -69,13 +84,17 @@ const FlashSale: React.FC<FlashSaleProps> = ({ products, onProductClick, onSeeAl
     startAutoScroll();
 
     return () => stopAutoScroll();
-  }, [products]);
+  }, [barakaOnlyProducts]);
 
   const format = (num: number) => num.toString().padStart(2, '0');
 
   const getOriginalPrice = (product: Product) => {
     if ((product as any).originalPrice) {
       return Number((product as any).originalPrice);
+    }
+
+    if ((product as any).original_price) {
+      return Number((product as any).original_price);
     }
 
     if (product.discount && product.discount > 0) {
@@ -85,7 +104,7 @@ const FlashSale: React.FC<FlashSaleProps> = ({ products, onProductClick, onSeeAl
     return Number(product.price);
   };
 
-  const displayProducts = products.length > 0 ? [...products, ...products] : [];
+  const displayProducts = barakaOnlyProducts.length > 0 ? [...barakaOnlyProducts, ...barakaOnlyProducts] : [];
 
   return (
     <section className="mx-3 my-3 rounded-3xl overflow-hidden border border-orange-100 bg-white shadow-sm">
@@ -102,7 +121,7 @@ const FlashSale: React.FC<FlashSaleProps> = ({ products, onProductClick, onSeeAl
               <div>
                 <p className="text-white font-extrabold text-base leading-none">Hot Deals</p>
                 <p className="text-orange-100 text-[11px] mt-1 font-medium">
-                  Best picks moving fast
+                  Baraka Sonko offers
                 </p>
               </div>
             </div>
@@ -172,7 +191,7 @@ const FlashSale: React.FC<FlashSaleProps> = ({ products, onProductClick, onSeeAl
                 <div className="relative aspect-square bg-white">
                   <img
                     src={p.image}
-                    alt={p.title || 'Product'}
+                    alt={p.title || p.name || 'Product'}
                     className="w-full h-full object-cover"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = 'https://via.placeholder.com/128?text=No+Image';
@@ -184,6 +203,10 @@ const FlashSale: React.FC<FlashSaleProps> = ({ products, onProductClick, onSeeAl
                       -{discount}%
                     </div>
                   )}
+
+                  <div className="absolute top-2 right-2 bg-blue-600 text-white text-[9px] px-2 py-1 rounded-full font-bold shadow-sm">
+                    Baraka
+                  </div>
                 </div>
 
                 <div className="p-2.5">
@@ -219,6 +242,12 @@ const FlashSale: React.FC<FlashSaleProps> = ({ products, onProductClick, onSeeAl
             );
           })}
         </div>
+
+        {barakaOnlyProducts.length === 0 && (
+          <div className="py-8 text-center">
+            <p className="text-sm text-gray-500 font-medium">No Baraka Sonko deals available</p>
+          </div>
+        )}
       </div>
     </section>
   );
