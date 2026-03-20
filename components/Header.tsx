@@ -8,7 +8,7 @@ interface HeaderProps {
   initialValue?: string;
   onProductSelect?: (product: Product) => void;
   onBarakasonkoClick?: () => void;
-  onSonkoClick?: () => void; // Add this prop for Sonko tab
+  onSonkoClick?: () => void;
 }
 
 interface SearchSuggestion {
@@ -31,7 +31,7 @@ const Header: React.FC<HeaderProps> = ({
   initialValue = '',
   onProductSelect,
   onBarakasonkoClick,
-  onSonkoClick // Add this prop
+  onSonkoClick
 }) => {
   const [query, setQuery] = useState(initialValue);
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
@@ -75,7 +75,7 @@ const Header: React.FC<HeaderProps> = ({
       title.includes(keyword) || category.includes(keyword) || description.includes(keyword)
     );
 
-    const isMicCategory = product.category_id === "3" || category.includes('mic');
+    const isMicCategory = product.category_id === '3' || category.includes('mic');
 
     return (hasMicKeyword && !shouldExclude) || isMicCategory;
   };
@@ -188,23 +188,25 @@ const Header: React.FC<HeaderProps> = ({
   const insideTabs = [
     {
       id: 'sonko',
-      label: 'Ndani ya Sonko Sound',
+      label: 'Sonko Sound',
       badge: 'Studio & Audio',
+      type: 'sonko',
     },
     {
       id: 'baraka',
-      label: 'Ndani ya Baraka Sonko',
+      label: 'Baraka Sonko',
       badge: 'Store & Deals',
+      type: 'baraka',
     },
   ] as const;
 
   const handleInsideTabClick = (tabId: 'sonko' | 'baraka') => {
     setActiveInsideTab(tabId);
-    
+
     if (tabId === 'baraka' && onBarakasonkoClick) {
       onBarakasonkoClick();
     } else if (tabId === 'sonko' && onSonkoClick) {
-      onSonkoClick(); // Call the sonko click handler
+      onSonkoClick();
     }
   };
 
@@ -228,6 +230,25 @@ const Header: React.FC<HeaderProps> = ({
           to { opacity: 1; transform: translateY(0); }
         }
 
+        @keyframes miniFloat {
+          0% { transform: translateX(0px) translateY(0px) scale(1); }
+          25% { transform: translateX(2px) translateY(-1px) scale(1.03); }
+          50% { transform: translateX(4px) translateY(-2px) scale(1.06); }
+          75% { transform: translateX(2px) translateY(-1px) scale(1.03); }
+          100% { transform: translateX(0px) translateY(0px) scale(1); }
+        }
+
+        @keyframes miniGlow {
+          0%, 100% {
+            opacity: 0.92;
+            filter: drop-shadow(0 0 0 rgba(249,115,22,0));
+          }
+          50% {
+            opacity: 1;
+            filter: drop-shadow(0 0 8px rgba(249,115,22,0.3));
+          }
+        }
+
         .animate-sound-pulse {
           animation: soundPulse 1.6s ease-in-out infinite;
         }
@@ -235,6 +256,11 @@ const Header: React.FC<HeaderProps> = ({
         .eq-bar-1 { animation: barDance 0.85s ease-in-out infinite; transform-origin: bottom; }
         .eq-bar-2 { animation: barDance 1.05s ease-in-out infinite; transform-origin: bottom; }
         .eq-bar-3 { animation: barDance 0.95s ease-in-out infinite; transform-origin: bottom; }
+
+        .animate-mini-icon {
+          animation: miniFloat 2.6s ease-in-out infinite, miniGlow 2.6s ease-in-out infinite;
+          transform-origin: center;
+        }
 
         .animate-fadeIn {
           animation: fadeInSoft 0.2s ease-out;
@@ -449,37 +475,58 @@ const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Ndani ya Sonko Sound / Ndani ya Baraka Sonko row */}
-      <div className="bg-[#fffaf5] border-b border-orange-100 px-3 py-2">
-        <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar">
+      {/* Ndani ya Sonko Sound / Ndani ya Baraka Sonko row - redesigned as buttons */}
+      <div className="bg-[#fffaf5] border-b border-orange-100 px-3 py-3">
+        <div className="flex items-center gap-2 justify-center">
           {insideTabs.map((tab) => {
             const isActive = activeInsideTab === tab.id;
             return (
               <button
                 key={tab.id}
                 onClick={() => handleInsideTabClick(tab.id)}
-                className={`relative min-w-max rounded-2xl px-4 py-2.5 text-left transition-all border ${
+                className={`relative flex-1 max-w-[200px] px-4 py-3 rounded-2xl transition-all duration-300 ${
                   isActive
-                    ? 'bg-white border-orange-200 shadow-sm'
-                    : 'bg-transparent border-transparent hover:bg-white/70'
+                    ? 'bg-white border-2 border-orange-200 shadow-lg'
+                    : 'bg-white/80 border border-orange-100 hover:bg-white hover:shadow-md'
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`w-2.5 h-2.5 rounded-full ${
-                      tab.id === 'sonko' ? 'bg-orange-500' : 'bg-gray-700'
-                    }`}
-                  />
-                  <span className={`text-sm font-bold ${isActive ? 'text-gray-900' : 'text-gray-700'}`}>
-                    {tab.label}
-                  </span>
+                <div className="flex items-center justify-center gap-3">
+                  {tab.type === 'sonko' ? (
+                    <div className="relative w-8 h-8 rounded-xl bg-gradient-to-br from-orange-100 via-white to-orange-50 flex items-center justify-center overflow-hidden">
+                      <div className="relative z-10 flex items-center justify-center animate-mini-icon">
+                        <div className="relative flex items-end gap-[2px] h-3.5 mr-1">
+                          <span className="eq-bar-1 w-[2px] h-2 rounded-full bg-orange-500" />
+                          <span className="eq-bar-2 w-[2px] h-3.5 rounded-full bg-orange-600" />
+                          <span className="eq-bar-3 w-[2px] h-2.5 rounded-full bg-orange-500" />
+                        </div>
+                        <div className="relative">
+                          <div className="w-3 h-3 rounded-full bg-orange-500 shadow-sm" />
+                          <span className="absolute -right-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 border-r-2 border-t-2 border-orange-400 rotate-45 rounded-sm animate-sound-pulse" />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="relative w-8 h-8 rounded-xl bg-gradient-to-br from-orange-100 via-white to-orange-50 flex items-center justify-center overflow-hidden">
+                      <div className="relative z-10 animate-mini-icon">
+                        <span className="text-orange-600 font-black text-[20px] leading-none select-none">
+                          B
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="text-left">
+                    <p className={`text-sm font-extrabold tracking-tight ${isActive ? 'text-gray-900' : 'text-gray-700'}`}>
+                      {tab.label}
+                    </p>
+                    <p className={`text-[10px] font-medium mt-0.5 ${isActive ? 'text-orange-500' : 'text-gray-400'}`}>
+                      {tab.badge}
+                    </p>
+                  </div>
                 </div>
-                <p className={`mt-0.5 text-[11px] ${isActive ? 'text-orange-500' : 'text-gray-400'}`}>
-                  {tab.badge}
-                </p>
 
                 {isActive && (
-                  <span className="absolute inset-x-4 -bottom-[6px] h-[3px] rounded-full bg-orange-500" />
+                  <span className="absolute left-4 right-4 -bottom-[6px] h-[3px] rounded-full bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600" />
                 )}
               </button>
             );
