@@ -6,6 +6,7 @@ interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   onCategorySelect: (category: Category) => void;
+  onSparesClick?: () => void;
 }
 
 type SidebarPage = 'menu' | 'about' | 'privacy' | 'terms';
@@ -30,6 +31,7 @@ const getDefaultIcon = (categoryName: string): string => {
   if (name.includes('all') || name.includes('zote')) return '◎';
   if (name.includes('electronics') || name.includes('umeme')) return '⎓';
   if (name.includes('accessories') || name.includes('vifaa')) return '◔';
+  if (name.includes('spare') || name.includes('parts') || name.includes('vipuri')) return '⚙'; // ← NEW
 
   return '◎';
 };
@@ -37,7 +39,8 @@ const getDefaultIcon = (categoryName: string): string => {
 const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onClose,
-  onCategorySelect
+  onCategorySelect,
+  onSparesClick
 }) => {
   const [currentPage, setCurrentPage] = useState<SidebarPage>('menu');
   const [categories, setCategories] = useState<Category[]>([]);
@@ -102,6 +105,12 @@ const Sidebar: React.FC<SidebarProps> = ({
     onClose();
   };
 
+  // ============ SPARES HANDLER (NEW) ============
+  const handleSpares = () => {
+    if (onSparesClick) onSparesClick();
+    closeSidebar();
+  };
+
   const renderMenu = () => (
     <div className="animate-fadeIn relative">
       {/* Background color sheds for menu */}
@@ -133,6 +142,66 @@ const Sidebar: React.FC<SidebarProps> = ({
               <div className="absolute -bottom-2 -right-2 w-16 h-16 bg-white/5 rounded-full" />
             </div>
           </div>
+        </div>
+
+        {/* ============ FEATURED: SPARES (NEW) ============ */}
+        <div className="px-5 pt-1 pb-3">
+          <button
+            onClick={handleSpares}
+            className="relative w-full rounded-2xl overflow-hidden text-left active:scale-[0.98] transition-transform shadow-lg shadow-orange-200/50 group"
+          >
+            {/* Gradient background */}
+            <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-orange-600" />
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
+            <div className="absolute bottom-0 left-0 w-24 h-24 bg-amber-400/20 rounded-full blur-2xl" />
+
+            <div className="relative flex items-center gap-3 p-4">
+              {/* Icon container */}
+              <div className="relative w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-white flex-shrink-0 border border-white/30 group-hover:scale-110 transition-transform duration-300">
+                {/* Professional wrench + gear SVG */}
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.1-2.1 2.7-2.5z" />
+                  <circle cx="18.5" cy="5.5" r="2.5" />
+                  <path d="M18.5 2v1.5M18.5 7.5V9M21.5 5.5H20M17 5.5h-1.5" />
+                </svg>
+              </div>
+
+              {/* Text */}
+              <div className="flex flex-col leading-tight flex-grow min-w-0">
+                <span className="text-white font-black text-sm uppercase tracking-wider">
+                  Spares
+                </span>
+                <span className="text-white/85 text-[10px] font-semibold truncate">
+                  Genuine spare parts &amp; accessories
+                </span>
+              </div>
+
+              {/* Chevron */}
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="2.5"
+                className="flex-shrink-0 group-hover:translate-x-1 transition-transform"
+              >
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </div>
+
+            {/* Hover shine */}
+            <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-1000" />
+          </button>
         </div>
 
         <div className="px-5 py-3 text-[11px] font-black text-gray-400 uppercase tracking-[0.15em] flex items-center gap-2">
